@@ -186,37 +186,65 @@ class NoteTransactions @Inject constructor(
      */
     suspend fun applyDeltaTxn(remoteNotes: List<RemoteNoteChange>, newSyncToken: String, now: Long) {
         transaction {
-            for (remote in remoteNotes) {
-                when {
-                    outboxDao.hasPendingOrInFlight(remote.noteId) -> Unit // SKIP entirely
-                    outboxDao.hasParked(remote.noteId) -> conflictDao.refreshRemote(
-                        remote.noteId,
-                        remote.version,
-                        remote.title.orEmpty(),
-                        remote.body.orEmpty(),
-                    )
-                    else -> {
-                        val local = noteDao.getNote(remote.noteId)
-                        when {
-                            local?.serverVersion == remote.version -> Unit // no-op, avoid churn
-                            remote.isDeleted -> if (local != null) noteDao.purge(remote.noteId)
-                            else -> noteDao.upsert(
-                                NoteEntity(
-                                    id = remote.noteId,
-                                    title = remote.title.orEmpty(),
-                                    body = remote.body.orEmpty(),
-                                    serverVersion = remote.version,
-                                    syncState = SyncState.SYNCED,
-                                    isDeleted = false,
-                                    createdAt = local?.createdAt ?: now,
-                                    lastUpdated = now,
-                                ),
-                            )
-                        }
+            applyRemoteNotesLocked(remoteNotes, now)
+            syncMetaDao.setSyncToken(SyncMetaEntity(syncToken = newSyncToken))
+        }
+    }
+
+    /**
+     * Bootstrap / re-bootstrap after token expiry (§7): applies the full current-state snapshot
+     * the same way [applyDeltaTxn] applies a page, *plus* one extra pass a plain delta page
+     * doesn't need — a bootstrap snapshot is exhaustive, so a previously-synced local note
+     * (`serverVersion != null`) that's simply absent from it, with no live op protecting it, was
+     * deleted server-side and must be purged locally. A local note with `serverVersion == null`
+     * needs no such handling: by invariant it always has a live (PENDING/IN_FLIGHT) op, which
+     * already exempts it via the ordinary skip rule.
+     */
+    suspend fun applyBootstrapTxn(remoteNotes: List<RemoteNoteChange>, newSyncToken: String, now: Long) {
+        transaction {
+            applyRemoteNotesLocked(remoteNotes, now)
+
+            val remoteIds = remoteNotes.mapTo(mutableSetOf()) { it.noteId }
+            for (local in noteDao.getAllSyncedNotes()) {
+                if (local.id in remoteIds) continue
+                if (outboxDao.hasPendingOrInFlight(local.id) || outboxDao.hasParked(local.id)) continue
+                noteDao.purge(local.id)
+            }
+
+            syncMetaDao.setSyncToken(SyncMetaEntity(syncToken = newSyncToken))
+        }
+    }
+
+    private suspend fun applyRemoteNotesLocked(remoteNotes: List<RemoteNoteChange>, now: Long) {
+        for (remote in remoteNotes) {
+            when {
+                outboxDao.hasPendingOrInFlight(remote.noteId) -> Unit // SKIP entirely
+                outboxDao.hasParked(remote.noteId) -> conflictDao.refreshRemote(
+                    remote.noteId,
+                    remote.version,
+                    remote.title.orEmpty(),
+                    remote.body.orEmpty(),
+                )
+                else -> {
+                    val local = noteDao.getNote(remote.noteId)
+                    when {
+                        local?.serverVersion == remote.version -> Unit // no-op, avoid churn
+                        remote.isDeleted -> if (local != null) noteDao.purge(remote.noteId)
+                        else -> noteDao.upsert(
+                            NoteEntity(
+                                id = remote.noteId,
+                                title = remote.title.orEmpty(),
+                                body = remote.body.orEmpty(),
+                                serverVersion = remote.version,
+                                syncState = SyncState.SYNCED,
+                                isDeleted = false,
+                                createdAt = local?.createdAt ?: now,
+                                lastUpdated = now,
+                            ),
+                        )
                     }
                 }
             }
-            syncMetaDao.setSyncToken(SyncMetaEntity(syncToken = newSyncToken))
         }
     }
 

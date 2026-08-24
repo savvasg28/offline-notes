@@ -29,6 +29,19 @@ interface NoteSyncOperations {
     /** One delta-pull page, applied with the skip rule (§6) and the advanced token, atomically. */
     suspend fun applyDelta(remoteNotes: List<RemoteNoteChange>, newSyncToken: String)
 
+    /**
+     * A full current-state snapshot (§7 bootstrap / token-expiry re-bootstrap): same skip rule as
+     * [applyDelta], plus purging previously-synced local notes that are absent from the snapshot
+     * with no live op protecting them (deleted server-side while this client was disconnected).
+     */
+    suspend fun applyBootstrap(remoteNotes: List<RemoteNoteChange>, newSyncToken: String)
+
     /** Crash recovery (§6 pipeline step 0): stale IN_FLIGHT ops go back to PENDING. */
     suspend fun resetStaleInFlight()
+
+    /** The opaque cursor to pass as `since` on the next pull; null before the first sync ever runs. */
+    suspend fun currentSyncToken(): String?
+
+    /** Loop check (§6 step 5): any PENDING op left after a drain round is live-editing residue. */
+    suspend fun hasPendingOps(): Boolean
 }

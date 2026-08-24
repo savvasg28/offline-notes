@@ -22,6 +22,10 @@ interface NoteDao {
     @Query("SELECT * FROM notes WHERE isDeleted = 0 ORDER BY lastUpdated DESC")
     fun observeActiveNotes(): Flow<List<NoteEntity>>
 
+    /** Bootstrap re-sync (§7): candidates for "deleted server-side, absent from the snapshot". */
+    @Query("SELECT * FROM notes WHERE serverVersion IS NOT NULL")
+    suspend fun getAllSyncedNotes(): List<NoteEntity>
+
     @Query("UPDATE notes SET serverVersion = :serverVersion WHERE id = :id")
     suspend fun updateServerVersion(id: String, serverVersion: String)
 

@@ -7,6 +7,7 @@ import com.savvasg.offlinenotes.data.local.NoteEntity
 import com.savvasg.offlinenotes.data.local.NoteTransactions
 import com.savvasg.offlinenotes.data.local.OutboxDao
 import com.savvasg.offlinenotes.data.local.RemoteNoteChange
+import com.savvasg.offlinenotes.data.local.SyncMetaDao
 import com.savvasg.offlinenotes.data.local.searchActiveNotes
 import com.savvasg.offlinenotes.domain.model.Note
 import com.savvasg.offlinenotes.domain.model.NoteListItem
@@ -28,6 +29,7 @@ import kotlinx.coroutines.flow.map
 class NoteRepositoryImpl @Inject constructor(
     private val noteDao: NoteDao,
     private val outboxDao: OutboxDao,
+    private val syncMetaDao: SyncMetaDao,
     private val transactions: NoteTransactions,
 ) : NoteRepository, NoteSyncOperations {
 
@@ -75,9 +77,17 @@ class NoteRepositoryImpl @Inject constructor(
         transactions.applyDeltaTxn(remoteNotes, newSyncToken, now = System.currentTimeMillis())
     }
 
+    override suspend fun applyBootstrap(remoteNotes: List<RemoteNoteChange>, newSyncToken: String) {
+        transactions.applyBootstrapTxn(remoteNotes, newSyncToken, now = System.currentTimeMillis())
+    }
+
     override suspend fun resetStaleInFlight() {
         outboxDao.resetInFlightToPending()
     }
+
+    override suspend fun currentSyncToken(): String? = syncMetaDao.getSyncToken()
+
+    override suspend fun hasPendingOps(): Boolean = outboxDao.hasAnyPending()
 }
 
 private fun NoteEntity.toDomain() = Note(

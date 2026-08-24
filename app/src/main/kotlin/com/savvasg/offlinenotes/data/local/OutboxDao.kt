@@ -24,6 +24,10 @@ interface OutboxDao {
     @Query("SELECT * FROM outbox WHERE status = 'PENDING' ORDER BY createdAt ASC")
     suspend fun getPendingOpsOrderedByCreatedAt(): List<OutboxEntity>
 
+    /** Sync engine loop check (§6 step 5): any PENDING op left is live-editing residue. */
+    @Query("SELECT EXISTS(SELECT 1 FROM outbox WHERE status = 'PENDING')")
+    suspend fun hasAnyPending(): Boolean
+
     @Query("UPDATE outbox SET status = :status WHERE opId = :opId")
     suspend fun updateStatus(opId: String, status: OutboxStatus)
 

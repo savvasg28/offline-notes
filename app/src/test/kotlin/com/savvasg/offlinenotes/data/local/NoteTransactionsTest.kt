@@ -370,4 +370,41 @@ class NoteTransactionsTest {
         val frozen = transactions.freezeTxn()
         assertThat(frozen.single().baseVersion).isEqualTo("v1")
     }
+
+    @Test
+    fun `expired_token_triggers_rebootstrap - local-only notes survive, previously-synced-and-now-absent notes are purged`() = runTest {
+        // A previously-synced note the bootstrap snapshot no longer contains (deleted server-side
+        // while this client was offline).
+        transactions.writeTxn("gone-remotely", "T1", "B1", now = 1000)
+        val goneOpId = db.outboxDao().getPendingForNote("gone-remotely")!!.opId
+        transactions.applyAppliedTxn(goneOpId, newVersion = "1")
+
+        // A brand-new local note never yet synced (serverVersion == null), with its CREATE op
+        // still PENDING — exactly the state a real client is in mid-edit.
+        transactions.writeTxn("local-only", "T2", "B2", now = 2000)
+
+        // Bootstrap snapshot contains neither note.
+        transactions.applyBootstrapTxn(remoteNotes = emptyList(), newSyncToken = "boot-1", now = 3000)
+
+        assertThat(db.noteDao().getNote("gone-remotely")).isNull()
+
+        val survivor = db.noteDao().getNote("local-only")
+        assertThat(survivor).isNotNull()
+        assertThat(survivor!!.serverVersion).isNull()
+        assertThat(db.outboxDao().getPendingForNote("local-only")).isNotNull()
+    }
+
+    @Test
+    fun `applyBootstrapTxn does not purge a note that still has a live op`() = runTest {
+        transactions.writeTxn("note-1", "T1", "B1", now = 1000)
+        val opId = db.outboxDao().getPendingForNote("note-1")!!.opId
+        transactions.applyAppliedTxn(opId, newVersion = "1")
+        // A second edit is in flight when the bootstrap runs.
+        transactions.writeTxn("note-1", "T2", "B2", now = 2000)
+        transactions.freezeTxn()
+
+        transactions.applyBootstrapTxn(remoteNotes = emptyList(), newSyncToken = "boot-1", now = 3000)
+
+        assertThat(db.noteDao().getNote("note-1")).isNotNull()
+    }
 }
