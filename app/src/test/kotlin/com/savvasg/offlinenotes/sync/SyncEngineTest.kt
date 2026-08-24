@@ -46,7 +46,14 @@ class SyncEngineTest {
         val transactions = NoteTransactions(db, db.noteDao(), db.outboxDao(), db.conflictDao(), db.syncMetaDao())
         // SyncScheduler just wraps WorkManager scheduling — irrelevant to these tests, which
         // drive SyncEngine.sync() directly rather than through the trigger layer.
-        repository = NoteRepositoryImpl(db.noteDao(), db.outboxDao(), db.syncMetaDao(), transactions, mockk(relaxed = true))
+        repository = NoteRepositoryImpl(
+            db.noteDao(),
+            db.outboxDao(),
+            db.conflictDao(),
+            db.syncMetaDao(),
+            transactions,
+            mockk(relaxed = true),
+        )
         serverCore = ServerCore()
         transport = FakeTransport(serverCore)
         engine = SyncEngine(repository, transport)
@@ -109,6 +116,24 @@ class SyncEngineTest {
 
         val conflict = db.conflictDao().getForNote("note-1")!!
         assertThat(conflict.remoteTitle).isEqualTo("Device B Title")
+    }
+
+    @Test
+    fun `observeConflict exposes local, base, and remote — the conflict screen's three inputs`() = runTest {
+        repository.saveNote("note-1", "Mine", "Mine body")
+        engine.sync()
+        serverCore.simulateConcurrentEdit("note-1", "Device B Title", "Device B Body")
+        repository.saveNote("note-1", "My Edit", "My Edit Body")
+        engine.sync()
+
+        val conflict = repository.observeConflict("note-1").first()!!
+
+        assertThat(conflict.localTitle).isEqualTo("My Edit")
+        assertThat(conflict.baseTitle).isEqualTo("Mine") // reconstructed from the server's change log
+        assertThat(conflict.remoteTitle).isEqualTo("Device B Title")
+
+        repository.resolveConflict("note-1", "Merged", "Merged body")
+        assertThat(repository.observeConflict("note-1").first()).isNull()
     }
 
     @Test

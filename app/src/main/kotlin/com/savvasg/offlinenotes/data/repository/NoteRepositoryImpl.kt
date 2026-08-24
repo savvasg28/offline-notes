@@ -1,5 +1,6 @@
 package com.savvasg.offlinenotes.data.repository
 
+import com.savvasg.offlinenotes.data.local.ConflictDao
 import com.savvasg.offlinenotes.data.local.ConflictPayload
 import com.savvasg.offlinenotes.data.local.FrozenOutboxOp
 import com.savvasg.offlinenotes.data.local.NoteDao
@@ -10,6 +11,7 @@ import com.savvasg.offlinenotes.data.local.RemoteNoteChange
 import com.savvasg.offlinenotes.data.local.SyncMetaDao
 import com.savvasg.offlinenotes.data.local.searchActiveNotes
 import com.savvasg.offlinenotes.domain.model.Note
+import com.savvasg.offlinenotes.domain.model.NoteConflict
 import com.savvasg.offlinenotes.domain.model.NoteListItem
 import com.savvasg.offlinenotes.domain.repository.NoteRepository
 import com.savvasg.offlinenotes.domain.repository.NoteSyncOperations
@@ -18,6 +20,7 @@ import com.savvasg.offlinenotes.sync.SyncScheduler
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 
 /**
@@ -30,6 +33,7 @@ import kotlinx.coroutines.flow.map
 class NoteRepositoryImpl @Inject constructor(
     private val noteDao: NoteDao,
     private val outboxDao: OutboxDao,
+    private val conflictDao: ConflictDao,
     private val syncMetaDao: SyncMetaDao,
     private val transactions: NoteTransactions,
     private val syncScheduler: SyncScheduler,
@@ -62,6 +66,22 @@ class NoteRepositoryImpl @Inject constructor(
         val matchQuery = buildFtsMatchQuery(query) ?: return observeNotes()
         return noteDao.searchActiveNotes(matchQuery).map { notes -> notes.map { it.toListItem() } }
     }
+
+    override fun observeConflict(noteId: String): Flow<NoteConflict?> =
+        combine(noteDao.observeNote(noteId), conflictDao.observeForNote(noteId)) { note, conflict ->
+            if (note == null || conflict == null) return@combine null
+            NoteConflict(
+                noteId = noteId,
+                localTitle = note.title,
+                localBody = note.body,
+                baseVersion = conflict.baseVersion,
+                baseTitle = conflict.baseTitle,
+                baseBody = conflict.baseBody,
+                remoteVersion = conflict.remoteVersion,
+                remoteTitle = conflict.remoteTitle,
+                remoteBody = conflict.remoteBody,
+            )
+        }
 
     // ---- NoteSyncOperations (sync-facing) ----
 

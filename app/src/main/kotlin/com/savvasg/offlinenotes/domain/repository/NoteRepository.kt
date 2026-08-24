@@ -1,6 +1,7 @@
 package com.savvasg.offlinenotes.domain.repository
 
 import com.savvasg.offlinenotes.domain.model.Note
+import com.savvasg.offlinenotes.domain.model.NoteConflict
 import com.savvasg.offlinenotes.domain.model.NoteListItem
 import kotlinx.coroutines.flow.Flow
 
@@ -16,4 +17,7 @@ interface NoteRepository {
     suspend fun deleteNote(id: String)
     suspend fun resolveConflict(noteId: String, title: String, body: String)
     fun searchNotes(query: String): Flow<List<NoteListItem>>
+
+    /** Backs the conflict resolution screen (§10): local + base + remote, one source each. */
+    fun observeConflict(noteId: String): Flow<NoteConflict?>
 }
