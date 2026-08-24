@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-only: permits cleartext HTTP so HttpTransport can reach the local demo
+  server, whether that's the emulator's host alias (10.0.2.2) or a physical
+  device pointed at the host's LAN IP from the debug panel (§9). Broad on
+  purpose: this file lives under src/debug and is never merged into release.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
