@@ -9,6 +9,7 @@ import com.savvasg.offlinenotes.data.local.OutboxEntity
 import com.savvasg.offlinenotes.data.local.SyncMetaDao
 import com.savvasg.offlinenotes.servercore.ServerCore
 import com.savvasg.offlinenotes.sync.SyncScheduler
+import com.savvasg.offlinenotes.sync.transport.TransportSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
@@ -30,6 +31,7 @@ class DebugPanelViewModel @Inject constructor(
     syncMetaDao: SyncMetaDao,
     noteDao: NoteDao,
     private val syncScheduler: SyncScheduler,
+    val transportSettings: TransportSettings,
 ) : ViewModel() {
 
     val outboxOps: StateFlow<List<OutboxEntity>> =

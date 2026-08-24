@@ -22,10 +22,10 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      # :app (Room/Repository/SyncEngine/Scheduler) and :server-core (server semantics).
-      # :server's own tests (once that module exists) get added here too.
+      # :app (Room/Repository/SyncEngine/Scheduler + HttpTransport/MockWebServer),
+      # :server-core (server semantics), :server (Ktor routes).
       - name: Run unit tests
-        run: ./gradlew :app:testDebugUnitTest :server-core:test --stacktrace
+        run: ./gradlew :app:testDebugUnitTest :server-core:test :server:test --stacktrace
 
       - name: Upload unit test reports
         if: failure()
@@ -35,6 +35,7 @@ jobs:
           path: |
             app/build/reports/tests/
             server-core/build/reports/tests/
+            server/build/reports/tests/
 
   instrumented-tests:
     runs-on: ubuntu-latest

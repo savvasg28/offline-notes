@@ -23,7 +23,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -49,6 +51,8 @@ fun DebugPanelScreen(
     val outboxOps by viewModel.outboxOps.collectAsStateWithLifecycle()
     val syncToken by viewModel.syncToken.collectAsStateWithLifecycle()
     val activeNotes by viewModel.activeNotes.collectAsStateWithLifecycle()
+    val useHttpTransport by viewModel.transportSettings.useHttpTransport.collectAsStateWithLifecycle()
+    val baseUrl by viewModel.transportSettings.baseUrl.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -68,6 +72,16 @@ fun DebugPanelScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item { SyncStatusSection(syncToken = syncToken, onForceSync = viewModel::forceSyncNow) }
+
+            item { SectionTitle("Transport (§9)") }
+            item {
+                TransportSection(
+                    useHttpTransport = useHttpTransport,
+                    baseUrl = baseUrl,
+                    onUseHttpTransportChange = viewModel.transportSettings::setUseHttpTransport,
+                    onBaseUrlChange = viewModel.transportSettings::setBaseUrl,
+                )
+            }
 
             item { SectionTitle("Global failure injection") }
             item {
@@ -113,6 +127,33 @@ private fun SyncStatusSection(syncToken: String?, onForceSync: () -> Unit) {
 @Composable
 private fun SectionTitle(text: String) {
     Text(text, style = MaterialTheme.typography.titleMedium)
+}
+
+@Composable
+private fun TransportSection(
+    useHttpTransport: Boolean,
+    baseUrl: String,
+    onUseHttpTransportChange: (Boolean) -> Unit,
+    onBaseUrlChange: (String) -> Unit,
+) {
+    Card(colors = CardDefaults.cardColors()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Use HTTP transport (:server demo)", style = MaterialTheme.typography.bodyMedium)
+                Switch(checked = useHttpTransport, onCheckedChange = onUseHttpTransportChange)
+            }
+            if (useHttpTransport) {
+                OutlinedTextField(
+                    value = baseUrl,
+                    onValueChange = onBaseUrlChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Server base URL") },
+                    supportingText = { Text("Emulator: 10.0.2.2 · physical device: host's LAN IP") },
+                    singleLine = true,
+                )
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)

@@ -3,8 +3,8 @@ package com.savvasg.offlinenotes.di
 import android.content.Context
 import androidx.work.WorkManager
 import com.savvasg.offlinenotes.servercore.ServerCore
+import com.savvasg.offlinenotes.sync.transport.SelectableTransport
 import com.savvasg.offlinenotes.sync.transport.SyncTransport
-import com.savvasg.offlinenotes.sync.transport.fake.FakeTransport
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -16,11 +16,11 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class SyncModule {
-    // Default transport (§9): FakeTransport calling server-core in-process, zero setup. A build
-    // flavour or debug-panel toggle can swap this for HttpTransport later without touching the
-    // sync engine, which only ever depends on the SyncTransport interface.
+    // FakeTransport is the zero-setup default; SelectableTransport is what SyncEngine actually
+    // sees — it picks FakeTransport vs HttpTransport per TransportSettings, driven by the debug
+    // panel (§9), without SyncEngine ever knowing a choice is being made.
     @Binds
-    abstract fun bindSyncTransport(impl: FakeTransport): SyncTransport
+    abstract fun bindSyncTransport(impl: SelectableTransport): SyncTransport
 
     companion object {
         @Provides

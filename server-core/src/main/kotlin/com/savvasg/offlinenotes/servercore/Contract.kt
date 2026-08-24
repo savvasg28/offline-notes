@@ -1,5 +1,6 @@
 package com.savvasg.offlinenotes.servercore
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /** Mirrors `data.local.OpType` in `:app`, but server-core cannot depend on `:app` (§9). */
@@ -17,15 +18,24 @@ data class OutgoingOp(
     val body: String?,
 )
 
-/** Per-op push result (§7). Conflict and Rejected are results, not transport errors. */
+/**
+ * Per-op push result (§7). Conflict and Rejected are results, not transport errors.
+ *
+ * `@SerialName` on each variant pins the wire discriminator to a short, stable string —
+ * without it, kotlinx.serialization defaults to the fully-qualified Kotlin class name, which
+ * would leak internal package structure into the HTTP wire format and break the moment a class
+ * gets renamed or moved.
+ */
 @Serializable
 sealed interface OpResult {
     val opId: String
 
     @Serializable
+    @SerialName("Applied")
     data class Applied(override val opId: String, val newVersion: String) : OpResult
 
     @Serializable
+    @SerialName("Conflict")
     data class Conflict(
         override val opId: String,
         val baseVersion: String?,
@@ -37,6 +47,7 @@ sealed interface OpResult {
     ) : OpResult
 
     @Serializable
+    @SerialName("Rejected")
     data class Rejected(override val opId: String, val code: String, val message: String) : OpResult
 }
 
