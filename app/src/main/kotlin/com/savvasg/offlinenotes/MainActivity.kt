@@ -14,6 +14,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.savvasg.offlinenotes.presentation.conflict.ConflictResolutionScreen
+import com.savvasg.offlinenotes.presentation.debug.DebugPanelScreen
 import com.savvasg.offlinenotes.presentation.editor.NoteEditorScreen
 import com.savvasg.offlinenotes.presentation.navigation.Routes
 import com.savvasg.offlinenotes.presentation.notelist.NotesListScreen
@@ -41,6 +42,7 @@ private fun OfflineNotesRoot() {
             NotesListScreen(
                 onNoteClick = { id -> navController.navigate(Routes.editor(id)) },
                 onNewNote = { id -> navController.navigate(Routes.editor(id)) },
+                onOpenDebugPanel = { navController.navigate(Routes.DEBUG_PANEL) },
             )
         }
         composable(
@@ -60,6 +62,9 @@ private fun OfflineNotesRoot() {
                 onResolved = { navController.popBackStack() },
                 onBack = { navController.popBackStack() },
             )
+        }
+        composable(Routes.DEBUG_PANEL) {
+            DebugPanelScreen(onBack = { navController.popBackStack() })
         }
     }
 }

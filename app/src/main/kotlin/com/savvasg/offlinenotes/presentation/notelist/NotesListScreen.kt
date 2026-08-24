@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
@@ -45,13 +46,23 @@ import java.util.Date
 fun NotesListScreen(
     onNoteClick: (String) -> Unit,
     onNewNote: (String) -> Unit,
+    onOpenDebugPanel: () -> Unit,
     viewModel: NotesListViewModel = hiltViewModel(),
 ) {
     val notes by viewModel.notes.collectAsStateWithLifecycle()
     val query by viewModel.searchQuery.collectAsStateWithLifecycle()
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Offline Notes") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Offline Notes") },
+                actions = {
+                    IconButton(onClick = onOpenDebugPanel) {
+                        Icon(Icons.Default.BugReport, contentDescription = "Debug panel")
+                    }
+                },
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(onClick = { onNewNote(viewModel.newNoteId()) }) {
                 Icon(Icons.Default.Add, contentDescription = "New note")
