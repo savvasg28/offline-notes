@@ -12,7 +12,9 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import javax.inject.Singleton
+import kotlinx.coroutines.Dispatchers
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -22,6 +24,10 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): OfflineNotesDatabase =
         Room.databaseBuilder(context, OfflineNotesDatabase::class.java, OfflineNotesDatabase.DB_NAME)
+            // See OfflineNotesDatabase.CALLBACK's kdoc: bundled, not platform, SQLite — FTS5
+            // isn't guaranteed on the OS-provided one.
+            .setDriver(BundledSQLiteDriver())
+            .setQueryCoroutineContext(Dispatchers.IO)
             .addCallback(OfflineNotesDatabase.SCHEMA_CALLBACK)
             .addCallback(OfflineNotesDatabase.FTS_CALLBACK)
             .build()

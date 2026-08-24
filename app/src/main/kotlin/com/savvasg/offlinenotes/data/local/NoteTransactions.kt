@@ -1,6 +1,7 @@
 package com.savvasg.offlinenotes.data.local
 
-import androidx.room.withTransaction
+import androidx.room.immediateTransaction
+import androidx.room.useWriterConnection
 import java.util.UUID
 import javax.inject.Inject
 
@@ -20,13 +21,23 @@ class NoteTransactions @Inject constructor(
     private fun newOpId(): String = UUID.randomUUID().toString()
 
     /**
+     * `androidx.room.withTransaction` assumes a `SupportSQLiteOpenHelper`, which doesn't exist
+     * once the database is built with `setDriver(BundledSQLiteDriver())` (see
+     * [OfflineNotesDatabase.CALLBACK]'s kdoc for why bundled SQLite is required at all) — it
+     * throws "Cannot return a SupportSQLiteOpenHelper" at runtime. This is the driver-based
+     * replacement: acquire the writer connection and start a transaction on it directly.
+     */
+    private suspend fun <R> transaction(block: suspend () -> R): R =
+        db.useWriterConnection { connection -> connection.immediateTransaction { block() } }
+
+    /**
      * Write txn (§5): a user edit. Upserts the note and coalesces into the note's existing
      * PENDING op if one exists (same opId, opType unchanged — a CREATE stays a CREATE), or
      * creates a new op otherwise. opType is decided from `serverVersion IS NULL` at that moment,
      * never from edit count.
      */
     suspend fun writeTxn(noteId: String, title: String, body: String, now: Long) {
-        db.withTransaction {
+        transaction {
             val existing = noteDao.getNote(noteId)
             noteDao.upsert(
                 NoteEntity(
@@ -67,8 +78,8 @@ class NoteTransactions @Inject constructor(
      * The row is purged only after the server acks the delete (§4) — never here.
      */
     suspend fun deleteTxn(noteId: String, now: Long) {
-        db.withTransaction {
-            val existing = noteDao.getNote(noteId) ?: return@withTransaction
+        transaction {
+            val existing = noteDao.getNote(noteId) ?: return@transaction
             noteDao.upsert(existing.copy(syncState = SyncState.PENDING, isDeleted = true, lastUpdated = now))
 
             val pendingOp = outboxDao.getPendingForNote(noteId)
@@ -97,7 +108,7 @@ class NoteTransactions @Inject constructor(
      * concurrently-created op can never ship a stale base. The returned payloads are immutable
      * from this point on.
      */
-    suspend fun freezeTxn(): List<FrozenOutboxOp> = db.withTransaction {
+    suspend fun freezeTxn(): List<FrozenOutboxOp> = transaction {
         outboxDao.getPendingOpsOrderedByCreatedAt().map { op ->
             val note = requireNotNull(noteDao.getNote(op.noteId)) {
                 "outbox op ${op.opId} references missing note ${op.noteId}"
@@ -120,8 +131,8 @@ class NoteTransactions @Inject constructor(
      * untouched. syncState only returns to SYNCED once no outbox rows remain for the note.
      */
     suspend fun applyAppliedTxn(opId: String, newVersion: String) {
-        db.withTransaction {
-            val op = outboxDao.getById(opId) ?: return@withTransaction
+        transaction {
+            val op = outboxDao.getById(opId) ?: return@transaction
             noteDao.updateServerVersion(op.noteId, newVersion)
             outboxDao.delete(opId)
             val remaining = outboxDao.countForNote(op.noteId)
@@ -135,8 +146,8 @@ class NoteTransactions @Inject constructor(
      * (invariant 2; see §7's "no MERGED result").
      */
     suspend fun applyConflictTxn(opId: String, conflict: ConflictPayload, detectedAt: Long) {
-        db.withTransaction {
-            val op = outboxDao.getById(opId) ?: return@withTransaction
+        transaction {
+            val op = outboxDao.getById(opId) ?: return@transaction
             outboxDao.updateStatus(opId, OutboxStatus.PARKED)
             conflictDao.upsert(
                 NoteConflictEntity(
@@ -160,8 +171,8 @@ class NoteTransactions @Inject constructor(
      * the deleted row so the caller can surface the error; the transaction itself is bookkeeping
      * only.
      */
-    suspend fun applyRejectedTxn(opId: String): OutboxEntity? = db.withTransaction {
-        val op = outboxDao.getById(opId) ?: return@withTransaction null
+    suspend fun applyRejectedTxn(opId: String): OutboxEntity? = transaction {
+        val op = outboxDao.getById(opId) ?: return@transaction null
         outboxDao.delete(opId)
         op
     }
@@ -174,7 +185,7 @@ class NoteTransactions @Inject constructor(
      * cursor outside of it would leave a silent permanent gap on crash.
      */
     suspend fun applyDeltaTxn(remoteNotes: List<RemoteNoteChange>, newSyncToken: String, now: Long) {
-        db.withTransaction {
+        transaction {
             for (remote in remoteNotes) {
                 when {
                     outboxDao.hasPendingOrInFlight(remote.noteId) -> Unit // SKIP entirely
@@ -217,8 +228,8 @@ class NoteTransactions @Inject constructor(
      * (possibly stale) `serverVersion`.
      */
     suspend fun resolveConflictTxn(noteId: String, title: String, body: String, now: Long) {
-        db.withTransaction {
-            val conflict = conflictDao.getForNote(noteId) ?: return@withTransaction
+        transaction {
+            val conflict = conflictDao.getForNote(noteId) ?: return@transaction
             outboxDao.delete(conflict.opId)
             conflictDao.delete(noteId)
 

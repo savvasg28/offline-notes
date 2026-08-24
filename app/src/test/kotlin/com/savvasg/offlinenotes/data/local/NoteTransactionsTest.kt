@@ -1,8 +1,10 @@
 package com.savvasg.offlinenotes.data.local
 
 import android.content.Context
-import android.database.sqlite.SQLiteConstraintException
 import androidx.room.Room
+import androidx.room.execSQL
+import androidx.room.useWriterConnection
+import androidx.sqlite.SQLiteException
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
@@ -26,6 +28,10 @@ class NoteTransactionsTest {
     @Before
     fun setUp() {
         val context = ApplicationProvider.getApplicationContext<Context>()
+        // No .setDriver(...) here: BundledSQLiteDriver ships an Android-native binary that can't
+        // load under Robolectric's host JVM. Falls back to Robolectric's own shadowed SQLite,
+        // which lacks FTS5 — see OfflineNotesDatabase.FTS_CALLBACK's kdoc — so only the schema
+        // callback (partial unique index) is applied; FTS5 is covered by an instrumented test.
         db = Room.inMemoryDatabaseBuilder(context, OfflineNotesDatabase::class.java)
             .addCallback(OfflineNotesDatabase.SCHEMA_CALLBACK)
             .allowMainThreadQueries()
@@ -78,14 +84,16 @@ class NoteTransactionsTest {
         // via INSERT OR IGNORE and would silently no-op instead of surfacing them) proves the
         // constraint lives in the schema itself, not just in NoteTransactions' own bookkeeping.
         try {
-            db.openHelper.writableDatabase.execSQL(
-                """
-                INSERT INTO outbox (opId, noteId, opType, title, body, status, createdAt, attemptCount)
-                VALUES ('manual-op', 'note-1', 'UPDATE', 'x', 'y', 'PENDING', 1001, 0)
-                """.trimIndent(),
-            )
-            throw AssertionError("expected SQLiteConstraintException")
-        } catch (expected: SQLiteConstraintException) {
+            db.useWriterConnection { connection ->
+                connection.execSQL(
+                    """
+                    INSERT INTO outbox (opId, noteId, opType, title, body, status, createdAt, attemptCount)
+                    VALUES ('manual-op', 'note-1', 'UPDATE', 'x', 'y', 'PENDING', 1001, 0)
+                    """.trimIndent(),
+                )
+            }
+            throw AssertionError("expected SQLiteException")
+        } catch (expected: SQLiteException) {
             // idx_outbox_one_pending fired.
         }
     }

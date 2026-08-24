@@ -7,6 +7,7 @@ import com.savvasg.offlinenotes.data.local.NoteEntity
 import com.savvasg.offlinenotes.data.local.NoteTransactions
 import com.savvasg.offlinenotes.data.local.OutboxDao
 import com.savvasg.offlinenotes.data.local.RemoteNoteChange
+import com.savvasg.offlinenotes.data.local.searchActiveNotes
 import com.savvasg.offlinenotes.domain.model.Note
 import com.savvasg.offlinenotes.domain.model.NoteListItem
 import com.savvasg.offlinenotes.domain.repository.NoteRepository

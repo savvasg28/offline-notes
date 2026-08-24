@@ -100,6 +100,11 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
+    // Bundled SQLite (not the OS-provided one): the system SQLite on real devices/emulators is
+    // not guaranteed to be built with FTS5 (confirmed absent on the API 36 emulator image used
+    // during development). BundledSQLiteDriver ships its own SQLite build with FTS5 compiled
+    // in, so behavior is identical everywhere — including under Robolectric in unit tests.
+    implementation(libs.androidx.sqlite.bundled)
 
     implementation(libs.androidx.work.runtime.ktx)
 
