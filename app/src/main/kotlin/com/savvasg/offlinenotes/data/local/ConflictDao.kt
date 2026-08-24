@@ -1,0 +1,27 @@
+package com.savvasg.offlinenotes.data.local
+
+import androidx.room.Dao
+import androidx.room.Query
+import androidx.room.Upsert
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface ConflictDao {
+    @Upsert
+    suspend fun upsert(conflict: NoteConflictEntity)
+
+    @Query("SELECT * FROM note_conflicts WHERE noteId = :noteId")
+    suspend fun getForNote(noteId: String): NoteConflictEntity?
+
+    @Query("SELECT * FROM note_conflicts WHERE noteId = :noteId")
+    fun observeForNote(noteId: String): Flow<NoteConflictEntity?>
+
+    @Query("DELETE FROM note_conflicts WHERE noteId = :noteId")
+    suspend fun delete(noteId: String)
+
+    /** Later delta pulls refresh the remote side of an unresolved conflict in place (§4). */
+    @Query(
+        "UPDATE note_conflicts SET remoteVersion = :remoteVersion, remoteTitle = :remoteTitle, remoteBody = :remoteBody WHERE noteId = :noteId",
+    )
+    suspend fun refreshRemote(noteId: String, remoteVersion: String, remoteTitle: String, remoteBody: String)
+}
