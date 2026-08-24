@@ -30,7 +30,7 @@ class NoteTransactionsTest {
             .addCallback(OfflineNotesDatabase.SCHEMA_CALLBACK)
             .allowMainThreadQueries()
             .build()
-        transactions = NoteTransactions(db, db.noteDao(), db.outboxDao(), db.conflictDao())
+        transactions = NoteTransactions(db, db.noteDao(), db.outboxDao(), db.conflictDao(), db.syncMetaDao())
     }
 
     @After
@@ -256,5 +256,110 @@ class NoteTransactionsTest {
         val op = db.outboxDao().getPendingForNote("note-1")
         assertThat(op).isNotNull()
         assertThat(op!!.status).isEqualTo(OutboxStatus.PENDING)
+    }
+
+    @Test
+    fun `pull_skips_notes_with_pending_ops - a delta carrying a remote change does not touch a locally-edited note`() = runTest {
+        transactions.writeTxn("note-1", "Local Title", "Local Body", now = 1000)
+
+        transactions.applyDeltaTxn(
+            remoteNotes = listOf(
+                RemoteNoteChange(noteId = "note-1", version = "v99", isDeleted = false, title = "Remote Title", body = "Remote Body"),
+            ),
+            newSyncToken = "token-1",
+            now = 2000,
+        )
+
+        val note = db.noteDao().getNote("note-1")!!
+        assertThat(note.title).isEqualTo("Local Title")
+        assertThat(note.body).isEqualTo("Local Body")
+        assertThat(note.serverVersion).isNull()
+    }
+
+    @Test
+    fun `delete_edit_race_resurrects - a remote tombstone against a note with a pending edit does not purge it`() = runTest {
+        transactions.writeTxn("note-1", "T1", "B1", now = 1000)
+        val opId = db.outboxDao().getPendingForNote("note-1")!!.opId
+        transactions.applyAppliedTxn(opId, newVersion = "v1")
+        transactions.writeTxn("note-1", "T2 (local edit)", "B2 (local edit)", now = 1500)
+
+        transactions.applyDeltaTxn(
+            remoteNotes = listOf(
+                RemoteNoteChange(noteId = "note-1", version = "v2", isDeleted = true, title = null, body = null),
+            ),
+            newSyncToken = "token-1",
+            now = 2000,
+        )
+
+        val note = db.noteDao().getNote("note-1")
+        assertThat(note).isNotNull()
+        assertThat(note!!.isDeleted).isFalse()
+        assertThat(note.title).isEqualTo("T2 (local edit)")
+    }
+
+    @Test
+    fun `applyDelta upserts new remote content and commits the sync token atomically`() = runTest {
+        transactions.applyDeltaTxn(
+            remoteNotes = listOf(
+                RemoteNoteChange(noteId = "note-1", version = "v1", isDeleted = false, title = "From Server", body = "Server Body"),
+            ),
+            newSyncToken = "token-1",
+            now = 5000,
+        )
+
+        val note = db.noteDao().getNote("note-1")!!
+        assertThat(note.title).isEqualTo("From Server")
+        assertThat(note.serverVersion).isEqualTo("v1")
+        assertThat(note.syncState).isEqualTo(SyncState.SYNCED)
+        assertThat(db.syncMetaDao().getSyncToken()).isEqualTo("token-1")
+    }
+
+    @Test
+    fun `applyDelta against a PARKED note only refreshes the conflict's remote side`() = runTest {
+        transactions.writeTxn("note-1", "Local Title", "Local Body", now = 1000)
+        val opId = db.outboxDao().getPendingForNote("note-1")!!.opId
+        transactions.applyConflictTxn(
+            opId,
+            ConflictPayload("v0", "Base Title", "Base Body", "v1", "Remote Title v1", "Remote Body v1"),
+            detectedAt = 1500,
+        )
+
+        transactions.applyDeltaTxn(
+            remoteNotes = listOf(
+                RemoteNoteChange(noteId = "note-1", version = "v2", isDeleted = false, title = "Remote Title v2", body = "Remote Body v2"),
+            ),
+            newSyncToken = "token-1",
+            now = 2000,
+        )
+
+        val note = db.noteDao().getNote("note-1")!!
+        assertThat(note.title).isEqualTo("Local Title") // untouched
+
+        val conflict = db.conflictDao().getForNote("note-1")!!
+        assertThat(conflict.remoteVersion).isEqualTo("v2")
+        assertThat(conflict.remoteTitle).isEqualTo("Remote Title v2")
+    }
+
+    @Test
+    fun `resolution_supersedes_parked_op - one transaction, new op with baseVersion equal to remoteVersion`() = runTest {
+        transactions.writeTxn("note-1", "Local Title", "Local Body", now = 1000)
+        val opId = db.outboxDao().getPendingForNote("note-1")!!.opId
+        transactions.applyConflictTxn(
+            opId,
+            ConflictPayload("v0", "Base Title", "Base Body", "v1", "Remote Title", "Remote Body"),
+            detectedAt = 1500,
+        )
+
+        transactions.resolveConflictTxn("note-1", "Merged Title", "Merged Body", now = 2000)
+
+        assertThat(db.outboxDao().getById(opId)).isNull()
+        assertThat(db.conflictDao().getForNote("note-1")).isNull()
+
+        val newOp = db.outboxDao().getPendingForNote("note-1")!!
+        assertThat(newOp.opId).isNotEqualTo(opId)
+        assertThat(newOp.title).isEqualTo("Merged Title")
+
+        val frozen = transactions.freezeTxn()
+        assertThat(frozen.single().baseVersion).isEqualTo("v1")
     }
 }

@@ -15,6 +15,7 @@ class NoteTransactions @Inject constructor(
     private val noteDao: NoteDao,
     private val outboxDao: OutboxDao,
     private val conflictDao: ConflictDao,
+    private val syncMetaDao: SyncMetaDao,
 ) {
     private fun newOpId(): String = UUID.randomUUID().toString()
 
@@ -163,5 +164,88 @@ class NoteTransactions @Inject constructor(
         val op = outboxDao.getById(opId) ?: return@withTransaction null
         outboxDao.delete(opId)
         op
+    }
+
+    /**
+     * Delta-pull page apply (§6): the skip rule read-path half of invariant 2. Safe to overwrite
+     * blindly when no op exists *because* the write txn guarantees any user edit has a
+     * corresponding op — the outbox isn't just a queue, it's what makes blind overwrite correct.
+     * The whole page and the advanced [newSyncToken] land in one transaction: advancing the
+     * cursor outside of it would leave a silent permanent gap on crash.
+     */
+    suspend fun applyDeltaTxn(remoteNotes: List<RemoteNoteChange>, newSyncToken: String, now: Long) {
+        db.withTransaction {
+            for (remote in remoteNotes) {
+                when {
+                    outboxDao.hasPendingOrInFlight(remote.noteId) -> Unit // SKIP entirely
+                    outboxDao.hasParked(remote.noteId) -> conflictDao.refreshRemote(
+                        remote.noteId,
+                        remote.version,
+                        remote.title.orEmpty(),
+                        remote.body.orEmpty(),
+                    )
+                    else -> {
+                        val local = noteDao.getNote(remote.noteId)
+                        when {
+                            local?.serverVersion == remote.version -> Unit // no-op, avoid churn
+                            remote.isDeleted -> if (local != null) noteDao.purge(remote.noteId)
+                            else -> noteDao.upsert(
+                                NoteEntity(
+                                    id = remote.noteId,
+                                    title = remote.title.orEmpty(),
+                                    body = remote.body.orEmpty(),
+                                    serverVersion = remote.version,
+                                    syncState = SyncState.SYNCED,
+                                    isDeleted = false,
+                                    createdAt = local?.createdAt ?: now,
+                                    lastUpdated = now,
+                                ),
+                            )
+                        }
+                    }
+                }
+            }
+            syncMetaDao.setSyncToken(SyncMetaEntity(syncToken = newSyncToken))
+        }
+    }
+
+    /**
+     * Conflict resolution (§8): one transaction — delete the parked op, delete the conflict row,
+     * write the resolved content, and enqueue a fresh op (new opId, baseVersion = remoteVersion)
+     * so the next drain ships it cleanly. There is no special "resolve" wire call (§8) — this is
+     * an ordinary write, just seeded from the conflict's remote version instead of the note's own
+     * (possibly stale) `serverVersion`.
+     */
+    suspend fun resolveConflictTxn(noteId: String, title: String, body: String, now: Long) {
+        db.withTransaction {
+            val conflict = conflictDao.getForNote(noteId) ?: return@withTransaction
+            outboxDao.delete(conflict.opId)
+            conflictDao.delete(noteId)
+
+            noteDao.upsert(
+                NoteEntity(
+                    id = noteId,
+                    title = title,
+                    body = body,
+                    serverVersion = conflict.remoteVersion,
+                    syncState = SyncState.PENDING,
+                    isDeleted = false,
+                    createdAt = noteDao.getNote(noteId)?.createdAt ?: now,
+                    lastUpdated = now,
+                ),
+            )
+            outboxDao.upsert(
+                OutboxEntity(
+                    opId = newOpId(),
+                    noteId = noteId,
+                    opType = OpType.UPDATE,
+                    title = title,
+                    body = body,
+                    status = OutboxStatus.PENDING,
+                    createdAt = now,
+                    attemptCount = 0,
+                ),
+            )
+        }
     }
 }

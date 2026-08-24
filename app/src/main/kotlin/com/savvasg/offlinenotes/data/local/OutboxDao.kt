@@ -34,6 +34,14 @@ interface OutboxDao {
     @Query("SELECT COUNT(*) FROM outbox WHERE noteId = :noteId")
     suspend fun countForNote(noteId: String): Int
 
+    /** Delta-pull skip rule, first half (§6): a note with a live op is never overwritten by a pull. */
+    @Query("SELECT EXISTS(SELECT 1 FROM outbox WHERE noteId = :noteId AND status IN ('PENDING', 'IN_FLIGHT'))")
+    suspend fun hasPendingOrInFlight(noteId: String): Boolean
+
+    /** Delta-pull skip rule, second half (§6): a parked conflict only gets its remote side refreshed. */
+    @Query("SELECT EXISTS(SELECT 1 FROM outbox WHERE noteId = :noteId AND status = 'PARKED')")
+    suspend fun hasParked(noteId: String): Boolean
+
     /** Crash recovery (§6 pipeline step 0). Safe because opIds are stable and replay dedupes. */
     @Query("UPDATE outbox SET status = 'PENDING' WHERE status = 'IN_FLIGHT'")
     suspend fun resetInFlightToPending()

@@ -5,7 +5,7 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [NoteEntity::class, OutboxEntity::class, NoteConflictEntity::class],
+    entities = [NoteEntity::class, OutboxEntity::class, NoteConflictEntity::class, SyncMetaEntity::class],
     version = 1,
     exportSchema = true,
 )
@@ -13,6 +13,7 @@ abstract class OfflineNotesDatabase : RoomDatabase() {
     abstract fun noteDao(): NoteDao
     abstract fun outboxDao(): OutboxDao
     abstract fun conflictDao(): ConflictDao
+    abstract fun syncMetaDao(): SyncMetaDao
 
     companion object {
         const val DB_NAME = "offline_notes.db"

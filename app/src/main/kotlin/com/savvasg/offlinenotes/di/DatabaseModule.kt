@@ -6,6 +6,7 @@ import com.savvasg.offlinenotes.data.local.ConflictDao
 import com.savvasg.offlinenotes.data.local.NoteDao
 import com.savvasg.offlinenotes.data.local.OfflineNotesDatabase
 import com.savvasg.offlinenotes.data.local.OutboxDao
+import com.savvasg.offlinenotes.data.local.SyncMetaDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -33,4 +34,7 @@ object DatabaseModule {
 
     @Provides
     fun provideConflictDao(db: OfflineNotesDatabase): ConflictDao = db.conflictDao()
+
+    @Provides
+    fun provideSyncMetaDao(db: OfflineNotesDatabase): SyncMetaDao = db.syncMetaDao()
 }

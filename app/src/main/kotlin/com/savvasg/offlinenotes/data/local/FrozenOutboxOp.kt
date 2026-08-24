@@ -23,3 +23,12 @@ data class ConflictPayload(
     val remoteTitle: String,
     val remoteBody: String,
 )
+
+/** One note's entry in a delta pull page (§6, §7) — a tombstone when [isDeleted] is true. */
+data class RemoteNoteChange(
+    val noteId: String,
+    val version: String,
+    val isDeleted: Boolean,
+    val title: String?,
+    val body: String?,
+)
