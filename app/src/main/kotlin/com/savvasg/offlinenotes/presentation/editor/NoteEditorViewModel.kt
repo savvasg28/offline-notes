@@ -5,8 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.savvasg.offlinenotes.domain.repository.NoteRepository
 import com.savvasg.offlinenotes.presentation.navigation.Routes
+import com.savvasg.offlinenotes.sync.SyncScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,13 +18,18 @@ import kotlinx.coroutines.launch
 
 /**
  * No save button (§10) — autosave is debounced ~500ms-1s of typing pause (§5). [flush] persists
- * immediately, bypassing the debounce, for editor close / app background (§6's expedited-sync
- * trigger will hang off the same call once the sync engine exists — for now this is purely the
- * Room-durability half of invariant 1).
+ * immediately, bypassing the debounce, for editor close / app background — the same signal §6
+ * uses to trigger an expedited sync, so [flush] does both: durability (Room) is invariant 1's
+ * job, freshness (a prompt push) is §6's.
+ *
+ * Both use `NonCancellable`: without it, a save launched right as the screen is popped could be
+ * cancelled mid-flight when the NavBackStackEntry's ViewModelStore clears viewModelScope —
+ * exactly the moment this method exists to protect against.
  */
 @HiltViewModel
 class NoteEditorViewModel @Inject constructor(
     private val repository: NoteRepository,
+    private val syncScheduler: SyncScheduler,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -68,7 +75,15 @@ class NoteEditorViewModel @Inject constructor(
     }
 
     fun flush() {
-        if (hasUserEdited) persistNow()
+        if (!hasUserEdited) return
+        val title = _title.value
+        val body = _body.value
+        if (!hasPersistedOnce && title.isBlank() && body.isBlank()) return
+        hasPersistedOnce = true
+        viewModelScope.launch(NonCancellable) {
+            repository.saveNote(noteId, title, body)
+            syncScheduler.expediteSync()
+        }
     }
 
     private fun persistNow() {
@@ -78,7 +93,7 @@ class NoteEditorViewModel @Inject constructor(
         // note has content on disk, always persist, including edits back down to blank.
         if (!hasPersistedOnce && title.isBlank() && body.isBlank()) return
         hasPersistedOnce = true
-        viewModelScope.launch { repository.saveNote(noteId, title, body) }
+        viewModelScope.launch(NonCancellable) { repository.saveNote(noteId, title, body) }
     }
 
     private companion object {

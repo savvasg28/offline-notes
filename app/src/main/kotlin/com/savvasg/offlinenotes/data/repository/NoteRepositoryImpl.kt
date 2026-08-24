@@ -14,6 +14,7 @@ import com.savvasg.offlinenotes.domain.model.NoteListItem
 import com.savvasg.offlinenotes.domain.repository.NoteRepository
 import com.savvasg.offlinenotes.domain.repository.NoteSyncOperations
 import com.savvasg.offlinenotes.domain.repository.OpAcknowledgement
+import com.savvasg.offlinenotes.sync.SyncScheduler
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
@@ -31,6 +32,7 @@ class NoteRepositoryImpl @Inject constructor(
     private val outboxDao: OutboxDao,
     private val syncMetaDao: SyncMetaDao,
     private val transactions: NoteTransactions,
+    private val syncScheduler: SyncScheduler,
 ) : NoteRepository, NoteSyncOperations {
 
     // ---- NoteRepository (UI-facing) ----
@@ -43,14 +45,17 @@ class NoteRepositoryImpl @Inject constructor(
 
     override suspend fun saveNote(id: String, title: String, body: String) {
         transactions.writeTxn(id, title, body, now = System.currentTimeMillis())
+        syncScheduler.scheduleDebouncedSync() // first edit since idle (§6); KEEP makes the rest no-ops
     }
 
     override suspend fun deleteNote(id: String) {
         transactions.deleteTxn(id, now = System.currentTimeMillis())
+        syncScheduler.scheduleDebouncedSync()
     }
 
     override suspend fun resolveConflict(noteId: String, title: String, body: String) {
         transactions.resolveConflictTxn(noteId, title, body, now = System.currentTimeMillis())
+        syncScheduler.scheduleDebouncedSync()
     }
 
     override fun searchNotes(query: String): Flow<List<NoteListItem>> {

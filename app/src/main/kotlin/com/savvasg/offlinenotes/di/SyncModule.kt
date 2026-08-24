@@ -1,5 +1,7 @@
 package com.savvasg.offlinenotes.di
 
+import android.content.Context
+import androidx.work.WorkManager
 import com.savvasg.offlinenotes.servercore.ServerCore
 import com.savvasg.offlinenotes.sync.transport.SyncTransport
 import com.savvasg.offlinenotes.sync.transport.fake.FakeTransport
@@ -7,6 +9,7 @@ import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
@@ -23,5 +26,9 @@ abstract class SyncModule {
         @Provides
         @Singleton
         fun provideServerCore(): ServerCore = ServerCore()
+
+        @Provides
+        @Singleton
+        fun provideWorkManager(@ApplicationContext context: Context): WorkManager = WorkManager.getInstance(context)
     }
 }

@@ -12,6 +12,7 @@ import com.savvasg.offlinenotes.data.repository.NoteRepositoryImpl
 import com.savvasg.offlinenotes.servercore.OpResult
 import com.savvasg.offlinenotes.servercore.ServerCore
 import com.savvasg.offlinenotes.sync.transport.fake.FakeTransport
+import io.mockk.mockk
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -43,7 +44,9 @@ class SyncEngineTest {
             .allowMainThreadQueries()
             .build()
         val transactions = NoteTransactions(db, db.noteDao(), db.outboxDao(), db.conflictDao(), db.syncMetaDao())
-        repository = NoteRepositoryImpl(db.noteDao(), db.outboxDao(), db.syncMetaDao(), transactions)
+        // SyncScheduler just wraps WorkManager scheduling — irrelevant to these tests, which
+        // drive SyncEngine.sync() directly rather than through the trigger layer.
+        repository = NoteRepositoryImpl(db.noteDao(), db.outboxDao(), db.syncMetaDao(), transactions, mockk(relaxed = true))
         serverCore = ServerCore()
         transport = FakeTransport(serverCore)
         engine = SyncEngine(repository, transport)
