@@ -1,0 +1,255 @@
+# Offline-First Notes
+
+A showcase Android app implementing an offline-first note-taking feature with multi-device sync.
+The sync engine is the product; the UI exists to exercise it. This README carries the invariants
+and the failure model — the reasoning behind the design, not just the design.
+
+```bash
+./gradlew installDebug
+```
+
+No credentials, no account registration, no backend to deploy. The default build runs against an
+in-process fake server, so it's fully functional offline the moment it installs.
+
+## Invariants
+
+Every design decision in this repo traces back to one of these five. They are not aspirational —
+they're enforced by the schema, the transaction boundaries, and the tests in §Testing below.
+
+1. **Zero data loss.** No user edit is ever silently discarded. Every local mutation is durable
+   before it is acknowledged to the user.
+2. **Content-write rule.** Note content (`title`, `body`) is written by exactly two things: the
+   user's own edits, and remote state the user has no pending local edits against. Nothing else
+   may ever write content — in particular, push responses never write content.
+3. **Local writes never wait on the network.** Room is the single source of truth; the UI
+   observes Room via `Flow`. Sync is entirely off the interactive path.
+4. **Atomicity.** Every multi-table mutation is a single Room transaction. A crash between two
+   related writes must be impossible.
+5. **Idempotent retries.** Any request may be sent more than once. Re-sending must never
+   duplicate an effect.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph Device
+        UI["UI (Compose)"] -- "writes via Repository" --> Repo
+        Repo["NoteRepository /\nNoteSyncOperations\n(one impl class)"]
+        Room[("Room DB\nnotes · outbox\nnote_conflicts · sync_meta")]
+        UI -- "observes Flow" --> Room
+        Repo --> Room
+        Engine["SyncEngine"] -- "drains" --> Repo
+        Work["WorkManager\n(SyncScheduler / SyncWorker)"] --> Engine
+        Engine --> Transport["SyncTransport"]
+        Transport --> Fake["FakeTransport\n(default)"]
+        Transport --> Http["HttpTransport\n(demo toggle)"]
+        Fake --> Core
+    end
+    Core["server-core\n(shared semantics)"]
+    Http -. "real HTTP" .-> Server
+    subgraph "Host machine"
+        Server[":server (Ktor)"] --> Core
+    end
+```
+
+Layers: `presentation` → `domain` (repository interfaces, models) → `data` (Room + repository
+impl). `sync` is a peer of `data`, not a child of it — the engine and the UI both sit on top of
+the repository, neither on top of the other.
+
+**One repository implementation behind two interfaces.** `NoteRepository` is UI-facing
+(`observeNotes`, `saveNote`, `resolveConflict`, ...); `NoteSyncOperations` is sync-facing
+(`freezeAndDrain`, `applyResult`, `stageConflict`, `applyDelta`, `resetStaleInFlight`). The sync
+engine only ever sees `NoteSyncOperations` — it is *structurally incapable* of calling
+`saveNote()`, because that method isn't on the interface it holds a reference to. This is what
+makes invariant 2 a compile-time guarantee rather than a code-review discipline: if the sync
+engine generated an outbox op from pulled data, it would echo the server's own changes back at
+it.
+
+## The op lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING: user edit\n(upsert in place if already PENDING)
+    PENDING --> IN_FLIGHT: freeze txn\n(linearization point)
+    IN_FLIGHT --> [*]: APPLIED\n(op deleted)
+    IN_FLIGHT --> PARKED: CONFLICT\n(three inputs staged)
+    IN_FLIGHT --> [*]: REJECTED\n(op deleted, poison pill)
+    IN_FLIGHT --> PENDING: crash\n(reset on next worker start)
+    PARKED --> PENDING: user resolves\n(new opId, baseVersion = remoteVersion)
+```
+
+An op row is deleted only when its data is on the server, or the user has explicitly superseded
+it. No TTL, no GC — expiry would be silent data loss. Edits arriving while an op is `IN_FLIGHT` or
+`PARKED` create a **new** row rather than mutating the in-flight one; the partial unique index
+`idx_outbox_one_pending` (WHERE `status = 'PENDING'`) is what makes "at most one *mutable* op per
+note" a schema-level fact, not a convention.
+
+## Conflict sequence
+
+```mermaid
+sequenceDiagram
+    participant B as Device B
+    participant S as Server
+    participant A as Device A (this app)
+    participant U as User (on A)
+
+    B->>S: push UPDATE(base=v1) for note X
+    S-->>B: Applied, newVersion=v2
+    U->>A: edits note X (still believes base=v1)
+    A->>S: push UPDATE(base=v1)
+    S-->>A: Conflict(base=v1, remote=v2, remoteTitle, remoteBody)
+    A->>A: park op · stage note_conflicts · syncState=CONFLICT
+    Note over A: local content untouched (invariant 2)
+    U->>A: opens resolution screen, picks a side or edits manually
+    A->>A: one txn: delete parked op + conflict row,\nwrite resolved content, enqueue new op
+    A->>S: push UPDATE(base=v2) — an ordinary op, new opId
+    S-->>A: Applied, newVersion=v3
+```
+
+Detection happens **only on push** — a pull carries no `baseVersion`, so it can only avoid
+creating conflicts (the skip rule), never detect one. There is no `/resolve` endpoint: resolution
+is an ordinary `UPDATE` op with the same idempotency and CAS as any other write.
+
+## Sync triggers
+
+| Trigger | Behaviour |
+|---|---|
+| First edit | Enqueue unique work (`KEEP`) with initial delay **W ≈ 30s**. Subsequent edits no-op. |
+| Connectivity regained | Free — the queued work's network constraint fires. |
+| Editor close / app background | Expedited, no delay. Flushes the session tail. |
+| App foreground | Delta pull. Primary freshness mechanism. |
+| Periodic | Long-interval backstop only (≥ 6h). |
+
+**W is the bounded data-loss window** — the maximum span of typing that exists on one device
+only — named as such in [`SyncScheduler`](app/src/main/kotlin/com/savvasg/offlinenotes/sync/SyncScheduler.kt).
+It's delay-*from-first-edit*, not debounce-from-last: a debounce never fires during continuous
+typing, so staleness would grow unbounded exactly when the user is producing the most unsynced
+work.
+
+No FCM: pull-on-foreground meets the freshness bar for a feature-tier product, at the cost of a
+wider multi-device concurrency window — absorbed by the conflict machinery above, not by
+correctness.
+
+## Run the hard cases yourself
+
+**Debug panel** (bug icon, top-right of the notes list) exposes every failure-injection switch as
+a single tap: latency, forced conflict, forced rejection, dropped response, expired sync token,
+rate limit, auth failure, and — the compelling one — **simulate a concurrent edit from
+"Device B."** Tap it on a synced note, edit that same note locally, and watch the conflict banner
+appear.
+
+**The real two-device demo.** The in-process fake can't show two *separate* app instances
+sharing state — each one owns its own fake. To see a genuine cross-device conflict:
+
+```bash
+./gradlew :server:run          # starts the Ktor server on :8080
+```
+
+Then, on each device/emulator, open the debug panel and turn on **"Use HTTP transport,"**
+pointing the base URL at the server:
+
+- Emulator → host: `http://10.0.2.2:8080/` (pre-filled by default)
+- Physical device → host: `http://<your-machine's-LAN-IP>:8080/`
+
+Edit the same note from both, and the second sync will surface a real conflict, resolved through
+the identical screen and identical `server-core` semantics the debug panel's simulated version
+uses — the two paths are provably the same code, not two implementations that happen to agree.
+
+**Scenario tests** (see below) exercise every one of these paths without a UI at all.
+
+## Testing
+
+```bash
+./gradlew :app:testDebugUnitTest :server-core:test :server:test   # 45 + 13 + 6 = 64 tests
+./gradlew :app:connectedDebugAndroidTest                          # 4 tests, needs a device/emulator
+```
+
+CI (`.github/workflows/ci.yml`) runs both on every push: a plain JVM job for the unit tests, and a
+`reactivecircus/android-emulator-runner` job for the instrumented ones.
+
+Named scenario tests, each corresponding to a real defect found while designing this system:
+
+| Test | Where | Asserts |
+|---|---|---|
+| `only_one_pending_op_per_note` | `NoteTransactionsTest` | Rapid edits coalesce in place; the unique index holds. |
+| `base_version_resolved_at_drain_not_creation` | `NoteTransactionsTest` | An op created before a prior ack ships the *post-ack* version. |
+| `apply_result_never_overwrites_content` | `NoteTransactionsTest` | After `APPLIED`, `body` still holds edits made after the freeze. |
+| `conflict_parks_op_and_stages_all_three_inputs` | `NoteTransactionsTest` | Local in `notes`, base+remote in `note_conflicts`, op `PARKED`. |
+| `resolution_supersedes_parked_op` | `NoteTransactionsTest`, `SyncEngineTest` | One transaction; new op with `baseVersion = remoteVersion`. |
+| `delete_edit_race_resurrects` | `NoteTransactionsTest` | Remote tombstone vs. local pending edit → note survives. |
+| `expired_token_triggers_rebootstrap` | `NoteTransactionsTest` | Local-only notes survive; previously-synced-and-now-absent notes are purged. |
+| `pull_skips_notes_with_pending_ops` | `NoteTransactionsTest`, `SyncEngineTest` | A remote change never clobbers a note being edited locally. |
+| `edit_during_in_flight_creates_second_op_and_loses_nothing` | `NoteTransactionsTest`, `SyncEngineTest` | A mid-flight edit lands in a new op; the ack deletes only the frozen one. |
+| `crash_between_send_and_ack_replays_safely` | `SyncEngineTest` | Stale `IN_FLIGHT` resets to `PENDING`; replay with the same `opId` is idempotent. |
+| `long_editing_session_produces_one_request_per_window` | `SyncSchedulerTest` | 20 debounced schedule calls collapse to one `ENQUEUED` work item. |
+| FTS DAO tests | `NoteDaoFtsTest` (instrumented) | Search matches title/body, excludes deleted notes, reflects updates. |
+
+Plus `ServerCoreTest` (13 tests: CAS success/conflict, batch independence, dedupe replay,
+bootstrap vs. incremental pull, tombstones, retention-driven token expiry), `ApplicationTest`
+(Ktor routing + status-code mapping), and `HttpTransportTest` (MockWebServer: serialization,
+status-code → exception mapping).
+
+## Rejected alternatives
+
+**`MERGED` push result.** An earlier version had the server auto-merge non-overlapping edits and
+return merged content directly. Cut because it violates invariant 2: applying merged content into
+a note the user is still editing either reverts text under their cursor, or — if you skip the
+write — silently loses the other device's contribution when the next local op ships. The only
+paths third-party content can enter the client are now the pull (guarded by the skip rule) and
+the conflict payload (parked, user-mediated, never auto-applied). Cost: concurrent
+non-overlapping edits that *could* have merged now surface as conflicts — the right trade for a
+notes feature.
+
+**FCM push.** For a feature-tier product the push taxonomy is cross-team cost; pull-on-foreground
+meets the freshness bar. The consequence — a wider concurrency window, more conflicts — is
+absorbed by the conflict machinery, not by correctness. Adding a push trigger later is additive
+(it's just another caller of `SyncScheduler.expediteSync()`).
+
+**Dropbox as the real backend.** The strongest real option — `files/upload` with `mode: update` +
+`rev` is a genuine CAS, `list_folder/continue` is a real cursor — but it requires an app
+registration and OAuth before anything runs, defeating the zero-setup goal.
+
+**Google Drive.** Android OAuth clients are bound to a signing-certificate fingerprint, so
+anyone building from source with their own debug keystore gets a broken app.
+
+**GitHub Contents API.** Genuine CAS and a commit-based change feed, but the workload is wrong:
+autosave-frequency writes against a model built for deliberate commits, permanent unreclaimable
+history for data whose intermediate states are worthless, and a 500 requests/hour ceiling that
+turns legitimate editing into failures.
+
+**Firestore.** Would do the interesting part for us — last-write-wins — leaving nothing to show.
+
+**KMP / iOS.** The sync engine would port cleanly, but the trigger layer (WorkManager) has no
+iOS equivalent, and a `shared` module with no real iOS consumer is a weaker claim than an honest
+single-platform project.
+
+**Dirty-flag vs. outbox.** A boolean "this note is dirty" flag can't express *what* changed, only
+*that* something did — it can't survive a partial apply (which field synced?), can't coalesce
+predictably, and gives you no idempotency key for retry. The outbox is what makes "the note has
+no PENDING/IN_FLIGHT op" a *provable* precondition for blindly applying a pull, rather than a
+hope.
+
+## Explicitly out of scope
+
+Rich text (a structured format would force the merge layer to be re-litigated — a separate
+project), real-time collaboration and CRDTs, attachments, end-to-end encryption, sharing between
+users, FCM push, KMP/iOS. Each has a seam in the design above where it would attach.
+
+## Tech stack
+
+**App:** Kotlin 2.2, Compose, Material 3, Room 2.8 (BundledSQLiteDriver — see below), WorkManager,
+Hilt, Coroutines/Flow, Retrofit/OkHttp + kotlinx-serialization.
+**Modules:** `:app` (Android) · `:server-core` (plain Kotlin/JVM, server semantics) · `:server`
+(Ktor, wraps `server-core` over HTTP).
+**Test:** JUnit, Robolectric, AndroidX Test, Turbine-compatible coroutines-test, MockWebServer,
+`WorkManagerTestInitHelper`, MockK, Truth.
+
+### A note on FTS5
+
+The app builds Room against `androidx.sqlite`'s `BundledSQLiteDriver` rather than the platform's
+own SQLite. This isn't a style choice — the OS-provided SQLite is **not** guaranteed to include
+the FTS5 extension search depends on; this was confirmed by an actual crash on an API 36 emulator
+image during development. The bundled driver ships its own SQLite with FTS5 compiled in, so
+behavior is identical on every device. The one place this doesn't reach is Robolectric's own
+bundled SQLite (a separate native binary, JVM-only) — unit tests build the database schema-only
+and FTS5 gets its coverage from the instrumented `NoteDaoFtsTest` instead.
