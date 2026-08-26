@@ -1,13 +1,16 @@
-package com.savvasg.offlinenotes.servercore
+package com.savvasg.offlinenotes.sync.transport
 
+import com.savvasg.offlinenotes.data.local.OpType
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/** Mirrors `data.local.OpType` in `:app`, but server-core cannot depend on `:app` (§9). */
-@Serializable
-enum class OpType { CREATE, UPDATE, DELETE }
-
-/** The wire shape of one pushed op (§7). */
+/**
+ * The wire contract [SyncTransport] implementations speak. This repo doesn't own backend
+ * semantics — the app is a client against a contract, full stop. These types describe that
+ * contract; nothing in this module implements it. [FakeTransport][com.savvasg.offlinenotes.sync.transport.fake.FakeTransport]
+ * is a scriptable stub for local dev/tests, and `HttpTransport` talks to whatever real (or
+ * Mockoon-mocked) server honours this shape.
+ */
 @Serializable
 data class OutgoingOp(
     val opId: String,
@@ -19,7 +22,7 @@ data class OutgoingOp(
 )
 
 /**
- * Per-op push result (§7). Conflict and Rejected are results, not transport errors.
+ * Per-op push result. Conflict and Rejected are results, not transport errors.
  *
  * `@SerialName` on each variant pins the wire discriminator to a short, stable string —
  * without it, kotlinx.serialization defaults to the fully-qualified Kotlin class name, which
@@ -51,7 +54,7 @@ sealed interface OpResult {
     data class Rejected(override val opId: String, val code: String, val message: String) : OpResult
 }
 
-/** One note's entry in a delta page (§6, §7) — a tombstone when [deleted] is true. */
+/** One note's entry in a delta page — a tombstone when [deleted] is true. */
 @Serializable
 data class RemoteNote(
     val noteId: String,
@@ -68,11 +71,11 @@ data class DeltaPage(
     val hasMore: Boolean,
 )
 
-/** syncToken no longer reaches far enough back into history (§7 token expiry). */
+/** syncToken no longer reaches far enough back into history — client clears it and re-bootstraps. */
 class SyncTokenExpiredException : Exception("sync token expired; client must clear it and re-bootstrap")
 
-/** Transport-level failures (§7): retry the whole batch with the same opIds. */
+/** Transport-level failures: retry the whole batch with the same opIds. */
 sealed class TransportException(message: String) : Exception(message)
-class AuthFailureException : TransportException("simulated auth failure")
-class RateLimitException : TransportException("simulated rate limit")
+class AuthFailureException : TransportException("auth failure")
+class RateLimitException : TransportException("rate limited")
 class SimulatedNetworkException(message: String) : TransportException(message)

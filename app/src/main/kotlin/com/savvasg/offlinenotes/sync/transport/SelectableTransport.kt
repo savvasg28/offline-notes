@@ -1,8 +1,5 @@
 package com.savvasg.offlinenotes.sync.transport
 
-import com.savvasg.offlinenotes.servercore.DeltaPage
-import com.savvasg.offlinenotes.servercore.OpResult
-import com.savvasg.offlinenotes.servercore.OutgoingOp
 import com.savvasg.offlinenotes.sync.transport.fake.FakeTransport
 import com.savvasg.offlinenotes.sync.transport.http.HttpTransport
 import javax.inject.Inject

@@ -8,8 +8,9 @@ and the failure model — the reasoning behind the design, not just the design.
 ./gradlew installDebug
 ```
 
-No credentials, no account registration, no backend to deploy. The default build runs against an
-in-process fake server, so it's fully functional offline the moment it installs.
+No credentials, no account registration, no backend to deploy. This repo doesn't own backend
+semantics — the app is a client against a wire contract, full stop — so the default build runs
+against a scriptable in-process stub, and it's fully functional offline the moment it installs.
 
 ## Invariants
 
@@ -41,20 +42,25 @@ flowchart LR
         Engine["SyncEngine"] -- "drains" --> Repo
         Work["WorkManager\n(SyncScheduler / SyncWorker)"] --> Engine
         Engine --> Transport["SyncTransport"]
-        Transport --> Fake["FakeTransport\n(default)"]
+        Transport --> Fake["FakeTransport\n(default, scriptable stub)"]
         Transport --> Http["HttpTransport\n(demo toggle)"]
-        Fake --> Core
     end
-    Core["server-core\n(shared semantics)"]
-    Http -. "real HTTP" .-> Server
-    subgraph "Host machine"
-        Server[":server (Ktor)"] --> Core
-    end
+    Http -. "real HTTP" .-> Backend["Mockoon\n(or any real server)"]
 ```
 
 Layers: `presentation` → `domain` (repository interfaces, models) → `data` (Room + repository
 impl). `sync` is a peer of `data`, not a child of it — the engine and the UI both sit on top of
 the repository, neither on top of the other.
+
+**This repo owns the client only.** There's no owned reference server implementation: the app is
+a correct client of a wire contract (`OutgoingOp`/`OpResult`/`DeltaPage`, defined in
+[`sync/transport/Contract.kt`](app/src/main/kotlin/com/savvasg/offlinenotes/sync/transport/Contract.kt)),
+and whatever answers on the other end of `HttpTransport` — a real backend, or the
+[Mockoon environment](mockoon/) checked in here — is out of scope for what this repo
+demonstrates. `FakeTransport`, the zero-setup default, is a stateless scriptable stub for the
+same reason: it returns `Applied` by default and lets the debug panel queue one-shot overrides
+(`Conflict`, `Rejected`, dropped response, expired token, ...), but it has no CAS, no
+persistence, no dedupe — those would be backend logic.
 
 **One repository implementation behind two interfaces.** `NoteRepository` is UI-facing
 (`observeNotes`, `saveNote`, `resolveConflict`, ...); `NoteSyncOperations` is sync-facing
@@ -132,36 +138,38 @@ correctness.
 
 ## Run the hard cases yourself
 
-**Debug panel** (bug icon, top-right of the notes list) exposes every failure-injection switch as
-a single tap: latency, forced conflict, forced rejection, dropped response, expired sync token,
-rate limit, auth failure, and — the compelling one — **simulate a concurrent edit from
-"Device B."** Tap it on a synced note, edit that same note locally, and watch the conflict banner
-appear.
+**Debug panel** (bug icon, top-right of the notes list) exposes `FakeTransport`'s failure-injection
+switches as a single tap: latency, forced conflict, forced rejection, dropped response, expired
+sync token, rate limit, auth failure. Tap "Force conflict (next push)" on a synced note, edit that
+note locally, and watch the conflict banner appear on the very next sync.
 
-**The real two-device demo.** The in-process fake can't show two *separate* app instances
-sharing state — each one owns its own fake. To see a genuine cross-device conflict:
+**Against a real (mocked) server.** `FakeTransport` is single-process and stateless, so it can't
+show two *separate* app instances converging on shared state. To see that, point `HttpTransport`
+at a real server instead — [`mockoon/offline-notes.json`](mockoon/) is a starter environment
+implementing the wire contract:
 
 ```bash
-./gradlew :server:run          # starts the Ktor server on :8080
+npx @mockoon/cli start --data mockoon/offline-notes.json --port 8080
 ```
 
-Then, on each device/emulator, open the debug panel and turn on **"Use HTTP transport,"**
-pointing the base URL at the server:
+Then, in the debug panel, turn on **"Use HTTP transport"** and set the base URL:
 
 - Emulator → host: `http://10.0.2.2:8080/` (pre-filled by default)
 - Physical device → host: `http://<your-machine's-LAN-IP>:8080/`
 
-Edit the same note from both, and the second sync will surface a real conflict, resolved through
-the identical screen and identical `server-core` semantics the debug panel's simulated version
-uses — the two paths are provably the same code, not two implementations that happen to agree.
+Run two app instances (two emulators, or an emulator + a physical device) against the same
+Mockoon instance, edit the same note from both, and enable the Conflict response in Mockoon (or
+add a rule) to see a real cross-device conflict resolved through the same screen the debug panel's
+`FakeTransport` version uses — the client-side conflict handling is identical either way, since
+`SyncEngine` never knows which `SyncTransport` it's talking to.
 
 **Scenario tests** (see below) exercise every one of these paths without a UI at all.
 
 ## Testing
 
 ```bash
-./gradlew :app:testDebugUnitTest :server-core:test :server:test   # 45 + 13 + 6 = 64 tests
-./gradlew :app:connectedDebugAndroidTest                          # 4 tests, needs a device/emulator
+./gradlew :app:testDebugUnitTest      # 45 tests
+./gradlew :app:connectedDebugAndroidTest  # 4 tests, needs a device/emulator
 ```
 
 CI (`.github/workflows/ci.yml`) runs both on every push: a plain JVM job for the unit tests, and a
@@ -180,14 +188,17 @@ Named scenario tests, each corresponding to a real defect found while designing 
 | `expired_token_triggers_rebootstrap` | `NoteTransactionsTest` | Local-only notes survive; previously-synced-and-now-absent notes are purged. |
 | `pull_skips_notes_with_pending_ops` | `NoteTransactionsTest`, `SyncEngineTest` | A remote change never clobbers a note being edited locally. |
 | `edit_during_in_flight_creates_second_op_and_loses_nothing` | `NoteTransactionsTest`, `SyncEngineTest` | A mid-flight edit lands in a new op; the ack deletes only the frozen one. |
-| `crash_between_send_and_ack_replays_safely` | `SyncEngineTest` | Stale `IN_FLIGHT` resets to `PENDING`; replay with the same `opId` is idempotent. |
+| `crash_between_send_and_ack_replays_safely` | `SyncEngineTest` | Stale `IN_FLIGHT` resets to `PENDING` and replays with the *same* `opId` — never a fabricated new one. |
 | `long_editing_session_produces_one_request_per_window` | `SyncSchedulerTest` | 20 debounced schedule calls collapse to one `ENQUEUED` work item. |
 | FTS DAO tests | `NoteDaoFtsTest` (instrumented) | Search matches title/body, excludes deleted notes, reflects updates. |
 
-Plus `ServerCoreTest` (13 tests: CAS success/conflict, batch independence, dedupe replay,
-bootstrap vs. incremental pull, tombstones, retention-driven token expiry), `ApplicationTest`
-(Ktor routing + status-code mapping), and `HttpTransportTest` (MockWebServer: serialization,
-status-code → exception mapping).
+Plus `HttpTransportTest` (7 tests, MockWebServer: serialization, status-code → exception mapping)
+and `BuildFtsMatchQueryTest` (6 tests: the FTS5 query-injection-safe prefix-match builder).
+
+Since this repo doesn't own backend semantics, `crash_between_send_and_ack_replays_safely` and
+`resolution_supersedes_parked_op` assert what's actually the *client's* responsibility — sending
+the identical `opId`/op on retry — rather than a specific server-side dedupe outcome, which would
+require `FakeTransport` to fake real backend state.
 
 ## Rejected alternatives
 
@@ -205,19 +216,17 @@ meets the freshness bar. The consequence — a wider concurrency window, more co
 absorbed by the conflict machinery, not by correctness. Adding a push trigger later is additive
 (it's just another caller of `SyncScheduler.expediteSync()`).
 
-**Dropbox as the real backend.** The strongest real option — `files/upload` with `mode: update` +
-`rev` is a genuine CAS, `list_folder/continue` is a real cursor — but it requires an app
-registration and OAuth before anything runs, defeating the zero-setup goal.
-
-**Google Drive.** Android OAuth clients are bound to a signing-certificate fingerprint, so
-anyone building from source with their own debug keystore gets a broken app.
-
-**GitHub Contents API.** Genuine CAS and a commit-based change feed, but the workload is wrong:
-autosave-frequency writes against a model built for deliberate commits, permanent unreclaimable
-history for data whose intermediate states are worthless, and a 500 requests/hour ceiling that
-turns legitimate editing into failures.
-
-**Firestore.** Would do the interesting part for us — last-write-wins — leaving nothing to show.
+**Owning a reference backend (`server-core` + a Ktor `:server` module).** An earlier version of
+this repo did exactly that — a plain-Kotlin state machine (CAS, opId dedupe, a change log) shared
+in-process by `FakeTransport` and wrapped in Ktor routes for a real-HTTP demo. Cut because it's
+scope creep for what this repo is actually meant to demonstrate: an offline-first *client*. Real
+products don't get to invent their own backend semantics to match their client's convenience —
+the client has to be correct against whatever contract the backend team actually ships, which is
+exactly what `HttpTransport` + a Mockoon-mocked (or genuinely real) server represents. The cost:
+`FakeTransport` can no longer fake real CAS/conflict detection on its own, so scenario tests now
+script the exact response each case needs (`forceConflictOnNextPush`, `queueNextPullPage`)
+instead of driving real server-side state — arguably a clearer signal of what's actually being
+tested, since the assertion is about the client's reaction, not about a fake server's fidelity.
 
 **KMP / iOS.** The sync engine would port cleanly, but the trigger layer (WorkManager) has no
 iOS equivalent, and a `shared` module with no real iOS consumer is a weaker claim than an honest
@@ -233,14 +242,15 @@ hope.
 
 Rich text (a structured format would force the merge layer to be re-litigated — a separate
 project), real-time collaboration and CRDTs, attachments, end-to-end encryption, sharing between
-users, FCM push, KMP/iOS. Each has a seam in the design above where it would attach.
+users, FCM push, KMP/iOS, and — deliberately — backend implementation of any kind. Each has a seam
+in the design above where it would attach.
 
 ## Tech stack
 
 **App:** Kotlin 2.2, Compose, Material 3, Room 2.8 (BundledSQLiteDriver — see below), WorkManager,
 Hilt, Coroutines/Flow, Retrofit/OkHttp + kotlinx-serialization.
-**Modules:** `:app` (Android) · `:server-core` (plain Kotlin/JVM, server semantics) · `:server`
-(Ktor, wraps `server-core` over HTTP).
+**Mock backend:** [Mockoon](mockoon/) (static/rule-based HTTP mocks) for the real-HTTP demo path;
+a scriptable stub (`FakeTransport`) for the zero-setup default.
 **Test:** JUnit, Robolectric, AndroidX Test, Turbine-compatible coroutines-test, MockWebServer,
 `WorkManagerTestInitHelper`, MockK, Truth.
 

@@ -67,7 +67,7 @@ class NoteEditorViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
-            edits.debounce(AUTOSAVE_DEBOUNCE_MS).collect { persistNow() }
+            edits.debounce(AUTOSAVE_DEBOUNCE_MS).collect { if (hasUserEdited) persistNow() }
         }
     }
 
@@ -83,12 +83,23 @@ class NoteEditorViewModel @Inject constructor(
         edits.tryEmit(Unit)
     }
 
+    /**
+     * Wired to both the ON_STOP lifecycle event and onDispose (see [com.savvasg.offlinenotes.presentation.editor.NoteEditorScreen]),
+     * which can both fire for the same navigation-away — so this must be idempotent per edit
+     * session. Without resetting [hasUserEdited], a second immediate call re-runs writeTxn on
+     * unchanged content, which unconditionally sets syncState back to PENDING — clobbering a
+     * CONFLICT that the first call's sync may have already staged in the meantime. Caught live:
+     * the debug panel's "force conflict" correctly parked the op and staged note_conflicts, but
+     * the note's syncState read back PENDING because a redundant second flush() had just re-run
+     * writeTxn on top of it.
+     */
     fun flush() {
         if (!hasUserEdited) return
         val title = _title.value
         val body = _body.value
         if (!hasPersistedOnce && title.isBlank() && body.isBlank()) return
         hasPersistedOnce = true
+        hasUserEdited = false
         viewModelScope.launch(NonCancellable) {
             repository.saveNote(noteId, title, body)
             syncScheduler.expediteSync()
@@ -102,6 +113,7 @@ class NoteEditorViewModel @Inject constructor(
         // note has content on disk, always persist, including edits back down to blank.
         if (!hasPersistedOnce && title.isBlank() && body.isBlank()) return
         hasPersistedOnce = true
+        hasUserEdited = false // symmetric with flush() — see its kdoc for why this matters
         viewModelScope.launch(NonCancellable) { repository.saveNote(noteId, title, body) }
     }
 

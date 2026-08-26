@@ -4,13 +4,14 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
-import com.savvasg.offlinenotes.data.local.OfflineNotesDatabase
 import com.savvasg.offlinenotes.data.local.NoteTransactions
+import com.savvasg.offlinenotes.data.local.OfflineNotesDatabase
 import com.savvasg.offlinenotes.data.local.OutboxStatus
 import com.savvasg.offlinenotes.data.local.SyncState
 import com.savvasg.offlinenotes.data.repository.NoteRepositoryImpl
-import com.savvasg.offlinenotes.servercore.OpResult
-import com.savvasg.offlinenotes.servercore.ServerCore
+import com.savvasg.offlinenotes.sync.transport.DeltaPage
+import com.savvasg.offlinenotes.sync.transport.OpResult
+import com.savvasg.offlinenotes.sync.transport.RemoteNote
 import com.savvasg.offlinenotes.sync.transport.fake.FakeTransport
 import io.mockk.mockk
 import kotlinx.coroutines.flow.first
@@ -23,16 +24,20 @@ import org.robolectric.RobolectricTestRunner
 
 /**
  * Integration tests wiring the real [NoteRepositoryImpl] + Room (schema only — see
- * NoteTransactionsTest for why FTS5 is excluded here) to [FakeTransport] backed by a real
- * [ServerCore], driven through [SyncEngine]. No Hilt: everything is small enough to construct
- * directly, which keeps these tests fast and free of any framework magic to reason around.
+ * NoteTransactionsTest for why FTS5 is excluded here) to a scripted [FakeTransport], driven
+ * through [SyncEngine]. No Hilt: everything is small enough to construct directly, which keeps
+ * these tests fast and free of any framework magic to reason around.
+ *
+ * This repo doesn't own backend semantics (§ Rejected alternatives) — [FakeTransport] is a
+ * stateless stub, not a simulated server — so these tests script exactly the responses each
+ * scenario needs (`forceConflictOnNextPush`, `queueNextPullPage`, ...) rather than driving real
+ * server-side CAS/version state.
  */
 @RunWith(RobolectricTestRunner::class)
 class SyncEngineTest {
 
     private lateinit var db: OfflineNotesDatabase
     private lateinit var repository: NoteRepositoryImpl
-    private lateinit var serverCore: ServerCore
     private lateinit var transport: FakeTransport
     private lateinit var engine: SyncEngine
 
@@ -54,8 +59,7 @@ class SyncEngineTest {
             transactions,
             mockk(relaxed = true),
         )
-        serverCore = ServerCore()
-        transport = FakeTransport(serverCore)
+        transport = FakeTransport()
         engine = SyncEngine(repository, transport)
     }
 
@@ -80,32 +84,34 @@ class SyncEngineTest {
     fun `crash_between_send_and_ack_replays_safely - end to end through the engine`() = runTest {
         repository.saveNote("note-1", "T", "B")
 
-        // The first attempt: freeze + push succeed (server applies and caches the result), but
-        // the process dies before the local apply txn runs — the ack is never processed.
+        // The first attempt: freeze + push succeed (server applies), but the process dies before
+        // the local apply txn runs — the ack is never processed.
         val frozen = repository.freezeAndDrain()
+        val opId = frozen.single().opId
         val pushed = transport.pushOps(frozen.map { it.toOutgoingOp() })
         assertThat(pushed.single()).isInstanceOf(OpResult.Applied::class.java)
 
-        val opId = frozen.single().opId
         assertThat(db.outboxDao().getById(opId)!!.status).isEqualTo(OutboxStatus.IN_FLIGHT)
 
-        // App restarts; engine.sync() resets the stale IN_FLIGHT op and re-drains.
+        // App restarts; engine.sync() resets the stale IN_FLIGHT op and re-freezes it — same
+        // opId (proven at the transaction layer by NoteTransactionsTest's crash-recovery test;
+        // this repo doesn't own backend semantics, so there's no server-side dedupe to assert
+        // "same version" against — what's the client's to guarantee is that it replays the
+        // identical op rather than fabricating a new one).
         val outcome = engine.sync()
 
         assertThat(outcome).isEqualTo(SyncOutcome.Done)
         assertThat(db.outboxDao().getById(opId)).isNull()
-        val note = db.noteDao().getNote("note-1")!!
-        assertThat(note.serverVersion).isEqualTo("1") // the version from the ORIGINAL apply, not a duplicate
-        assertThat(note.syncState).isEqualTo(SyncState.SYNCED)
+        assertThat(repository.observeNote("note-1").first()!!.syncState).isEqualTo(SyncState.SYNCED)
     }
 
     @Test
-    fun `a stale-base push surfaces as a staged conflict, not a crash or silent overwrite`() = runTest {
+    fun `a forced conflict surfaces as a staged conflict, not a crash or silent overwrite`() = runTest {
         repository.saveNote("note-1", "Mine", "Mine body")
-        engine.sync() // establishes the note on the server at v1
+        engine.sync() // lands SYNCED
 
-        serverCore.simulateConcurrentEdit("note-1", "Device B Title", "Device B Body")
-        repository.saveNote("note-1", "My Edit", "My Edit Body") // still based on v1 locally
+        transport.forceConflictOnNextPush("note-1", "Device B Title", "Device B Body")
+        repository.saveNote("note-1", "My Edit", "My Edit Body")
 
         val outcome = engine.sync()
 
@@ -119,17 +125,17 @@ class SyncEngineTest {
     }
 
     @Test
-    fun `observeConflict exposes local, base, and remote — the conflict screen's three inputs`() = runTest {
+    fun `observeConflict exposes local and remote — the conflict screen's inputs`() = runTest {
         repository.saveNote("note-1", "Mine", "Mine body")
         engine.sync()
-        serverCore.simulateConcurrentEdit("note-1", "Device B Title", "Device B Body")
+        transport.forceConflictOnNextPush("note-1", "Device B Title", "Device B Body")
         repository.saveNote("note-1", "My Edit", "My Edit Body")
         engine.sync()
 
         val conflict = repository.observeConflict("note-1").first()!!
 
         assertThat(conflict.localTitle).isEqualTo("My Edit")
-        assertThat(conflict.baseTitle).isEqualTo("Mine") // reconstructed from the server's change log
+        assertThat(conflict.baseTitle).isNull() // no owned backend history to reconstruct a base from
         assertThat(conflict.remoteTitle).isEqualTo("Device B Title")
 
         repository.resolveConflict("note-1", "Merged", "Merged body")
@@ -141,13 +147,12 @@ class SyncEngineTest {
         repository.saveNote("note-1", "T1", "B1")
         engine.sync()
 
-        serverCore.simulateConcurrentEdit("note-1", "Remote Title", "Remote Body")
-        repository.saveNote("note-1", "Local In Progress", "Local In Progress Body")
+        repository.saveNote("note-1", "Local In Progress", "Local In Progress Body") // fresh PENDING op
 
-        // Pull happens as part of sync(), but the push above already turned this into a conflict
-        // path in the previous test; here we isolate the pull-side skip rule directly.
-        val page = transport.pullDelta(repository.currentSyncToken())
-        repository.applyDelta(page.notes.map { it.toRemoteNoteChange() }, page.nextSyncToken)
+        // Isolates the pull-side skip rule directly, independent of whatever the push side of
+        // this same round would do to that PENDING op.
+        val remoteChange = RemoteNote("note-1", version = "99", deleted = false, title = "Remote Title", body = "Remote Body")
+        repository.applyDelta(listOf(remoteChange).map { it.toRemoteNoteChange() }, newSyncToken = "99")
 
         val note = repository.observeNote("note-1").first()!!
         assertThat(note.title).isEqualTo("Local In Progress")
@@ -158,7 +163,13 @@ class SyncEngineTest {
         repository.saveNote("note-1", "T1", "B1")
         engine.sync()
 
-        serverCore.simulateConcurrentEdit("note-1", "Remote Title", "Remote Body")
+        transport.queueNextPullPage(
+            DeltaPage(
+                notes = listOf(RemoteNote("note-1", version = "999", deleted = false, title = "Remote Title", body = "Remote Body")),
+                nextSyncToken = "999",
+                hasMore = false,
+            ),
+        )
         engine.sync()
 
         val note = repository.observeNote("note-1").first()!!
@@ -169,7 +180,7 @@ class SyncEngineTest {
     @Test
     fun `a transport failure leaves the op IN_FLIGHT, and the next successful run recovers it`() = runTest {
         repository.saveNote("note-1", "T1", "B1")
-        serverCore.forceAuthFailureOnNextCall()
+        transport.forceAuthFailureOnNextCall()
 
         val outcome = engine.sync()
 
@@ -187,7 +198,7 @@ class SyncEngineTest {
     fun `resolution_supersedes_parked_op - resolving a conflict and syncing again ships cleanly`() = runTest {
         repository.saveNote("note-1", "Mine", "Mine body")
         engine.sync()
-        serverCore.simulateConcurrentEdit("note-1", "Device B", "Device B body")
+        transport.forceConflictOnNextPush("note-1", "Device B", "Device B body")
         repository.saveNote("note-1", "My Edit", "My Edit body")
         engine.sync()
 

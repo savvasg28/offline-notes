@@ -1,13 +1,10 @@
 package com.savvasg.offlinenotes.sync.transport
 
-import com.savvasg.offlinenotes.servercore.DeltaPage
-import com.savvasg.offlinenotes.servercore.OpResult
-import com.savvasg.offlinenotes.servercore.OutgoingOp
-
 /**
- * The transport contract (§7). Both [FakeTransport][com.savvasg.offlinenotes.sync.transport.fake.FakeTransport]
- * and `HttpTransport` implement this against the identical `server-core` semantics — one
- * contract, two ways to reach it.
+ * The transport contract. Both [FakeTransport][com.savvasg.offlinenotes.sync.transport.fake.FakeTransport]
+ * and `HttpTransport` implement this — one contract, two ways to reach it: a scriptable local
+ * stub for zero-setup dev/tests, and a real HTTP client for whatever server (or Mockoon mock)
+ * actually implements the semantics on the other end.
  *
  * Contract rules an implementation must honour:
  * - Per-op independence: one conflict never fails the batch; results come back in request order.

@@ -7,26 +7,27 @@ import com.savvasg.offlinenotes.data.local.NoteEntity
 import com.savvasg.offlinenotes.data.local.OutboxDao
 import com.savvasg.offlinenotes.data.local.OutboxEntity
 import com.savvasg.offlinenotes.data.local.SyncMetaDao
-import com.savvasg.offlinenotes.servercore.ServerCore
 import com.savvasg.offlinenotes.sync.SyncScheduler
 import com.savvasg.offlinenotes.sync.transport.TransportSettings
+import com.savvasg.offlinenotes.sync.transport.fake.FakeTransport
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 
 /**
- * Backs the debug panel (§10): failure injection, the outbox inspector, the current sync token,
- * and force-sync. Injects [ServerCore] directly rather than going through [com.savvasg.offlinenotes.sync.transport.SyncTransport] —
- * these controls aren't something any real transport implementation would expose to callers,
- * they're test/demo scaffolding for whichever transport happens to be backed by this server-core
- * instance (§9).
+ * Backs the debug panel: failure injection, the outbox inspector, the current sync token, and
+ * force-sync. Injects [FakeTransport] directly rather than going through
+ * [com.savvasg.offlinenotes.sync.transport.SyncTransport] — these controls aren't part of the
+ * transport contract any real implementation would expose to callers, they're demo/test
+ * scaffolding specific to the stub. (They have no effect when the debug panel's "Use HTTP
+ * transport" toggle is on — that path is real HTTP against whatever Mockoon/real server is
+ * configured, which has its own way of scripting responses.)
  */
 @HiltViewModel
 class DebugPanelViewModel @Inject constructor(
-    private val serverCore: ServerCore,
+    private val fakeTransport: FakeTransport,
     outboxDao: OutboxDao,
     syncMetaDao: SyncMetaDao,
     noteDao: NoteDao,
@@ -45,24 +46,18 @@ class DebugPanelViewModel @Inject constructor(
 
     fun forceSyncNow() = syncScheduler.expediteSync()
 
-    fun setLatency(minMillis: Long, maxMillis: Long) = serverCore.setLatencyMillis(minMillis..maxMillis)
-    fun clearLatency() = serverCore.setLatencyMillis(null)
+    fun setLatency(minMillis: Long, maxMillis: Long) = fakeTransport.setLatencyMillis(minMillis..maxMillis)
+    fun clearLatency() = fakeTransport.setLatencyMillis(null)
 
-    fun forceConflictOnNextPush(noteId: String) = serverCore.forceConflictOnNextPush(noteId)
+    /** One tap: queues a Conflict for this note's next push, and its remote content — no
+     * separate "simulate Device B" step needed, since there's no real server state to write to. */
+    fun forceConflictOnNextPush(noteId: String) = fakeTransport.forceConflictOnNextPush(noteId)
+
     fun forceRejectedOnNextPush(noteId: String) =
-        serverCore.forceRejectedOnNextPush(noteId, code = "SIMULATED_REJECTION", message = "Rejected by debug panel")
+        fakeTransport.forceRejectedOnNextPush(noteId, code = "SIMULATED_REJECTION", message = "Rejected by debug panel")
 
-    fun dropNextResponseFor(opId: String) = serverCore.dropNextResponseFor(opId)
-    fun expireTokenOnNextPull() = serverCore.expireTokenOnNextPull()
-    fun forceRateLimitOnNextCall() = serverCore.forceRateLimitOnNextCall()
-    fun forceAuthFailureOnNextCall() = serverCore.forceAuthFailureOnNextCall()
-
-    /** "Device B" writing directly to server state — the only way to produce a genuine conflict. */
-    fun simulateConcurrentEdit(noteId: String, title: String, body: String) {
-        viewModelScope.launch { serverCore.simulateConcurrentEdit(noteId, title, body) }
-    }
-
-    fun simulateConcurrentDelete(noteId: String) {
-        viewModelScope.launch { serverCore.simulateConcurrentDelete(noteId) }
-    }
+    fun dropNextResponseFor(opId: String) = fakeTransport.dropNextResponseFor(opId)
+    fun expireTokenOnNextPull() = fakeTransport.expireTokenOnNextPull()
+    fun forceRateLimitOnNextCall() = fakeTransport.forceRateLimitOnNextCall()
+    fun forceAuthFailureOnNextCall() = fakeTransport.forceAuthFailureOnNextCall()
 }

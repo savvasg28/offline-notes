@@ -169,14 +169,6 @@ private fun NoteActionsCard(note: NoteEntity, viewModel: DebugPanelViewModel) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(note.title.ifBlank { "Untitled" }, style = MaterialTheme.typography.titleSmall)
             FlowActions {
-                OutlinedButton(onClick = {
-                    viewModel.simulateConcurrentEdit(
-                        note.id,
-                        "Edited by Device B",
-                        "This edit came from a simulated second device.",
-                    )
-                }) { Text("Simulate Device B edit") }
-                OutlinedButton(onClick = { viewModel.simulateConcurrentDelete(note.id) }) { Text("Simulate Device B delete") }
                 OutlinedButton(onClick = { viewModel.forceConflictOnNextPush(note.id) }) { Text("Force conflict (next push)") }
                 OutlinedButton(onClick = { viewModel.forceRejectedOnNextPush(note.id) }) { Text("Force rejection (next push)") }
             }

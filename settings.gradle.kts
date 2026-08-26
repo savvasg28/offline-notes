@@ -17,5 +17,3 @@ dependencyResolutionManagement {
 rootProject.name = "OfflineNotes"
 
 include(":app")
-include(":server-core")
-include(":server")
