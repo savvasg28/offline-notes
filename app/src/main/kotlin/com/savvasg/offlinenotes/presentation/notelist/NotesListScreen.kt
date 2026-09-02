@@ -46,7 +46,7 @@ import java.util.Date
 fun NotesListScreen(
     onNoteClick: (String) -> Unit,
     onNewNote: (String) -> Unit,
-    onOpenDebugPanel: () -> Unit,
+    onOpenDebugPanel: (() -> Unit)?,
     viewModel: NotesListViewModel = hiltViewModel(),
 ) {
     val notes by viewModel.notes.collectAsStateWithLifecycle()
@@ -57,8 +57,11 @@ fun NotesListScreen(
             TopAppBar(
                 title = { Text("Offline Notes") },
                 actions = {
-                    IconButton(onClick = onOpenDebugPanel) {
-                        Icon(Icons.Default.BugReport, contentDescription = "Debug panel")
+                    // Absent in release builds, where the debug panel isn't compiled in at all.
+                    if (onOpenDebugPanel != null) {
+                        IconButton(onClick = onOpenDebugPanel) {
+                            Icon(Icons.Default.BugReport, contentDescription = "Debug panel")
+                        }
                     }
                 },
             )

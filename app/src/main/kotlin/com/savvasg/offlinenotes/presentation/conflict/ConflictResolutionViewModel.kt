@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.savvasg.offlinenotes.domain.model.NoteConflict
 import com.savvasg.offlinenotes.domain.repository.NoteRepository
-import com.savvasg.offlinenotes.presentation.navigation.Routes
+import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,7 +26,7 @@ class ConflictResolutionViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
-    val noteId: String = checkNotNull(savedStateHandle[Routes.CONFLICT_ARG_NOTE_ID])
+    val noteId: String = savedStateHandle.toRoute<ConflictRoute>().noteId
 
     val conflict: StateFlow<NoteConflict?> = repository.observeConflict(noteId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)

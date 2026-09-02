@@ -1,9 +1,9 @@
 package com.savvasg.offlinenotes.presentation.editor
 
 import androidx.lifecycle.SavedStateHandle
+import androidx.navigation.testing.invoke
 import com.savvasg.offlinenotes.domain.model.Note
 import com.savvasg.offlinenotes.domain.repository.NoteRepository
-import com.savvasg.offlinenotes.presentation.navigation.Routes
 import com.savvasg.offlinenotes.sync.SyncScheduler
 import io.mockk.coVerify
 import io.mockk.every
@@ -18,6 +18,8 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 /**
  * Regression test for a bug caught live (§ NoteEditorViewModel.flush kdoc): [NoteEditorScreen]
@@ -27,6 +29,7 @@ import org.junit.Test
  * first call's sync had already staged in the meantime.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(RobolectricTestRunner::class) // SavedStateHandle(route = ...) encodes via android.net.Uri
 class NoteEditorViewModelTest {
 
     private val repository = mockk<NoteRepository>(relaxed = true)
@@ -37,7 +40,7 @@ class NoteEditorViewModelTest {
     fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         every { repository.observeNote("note-1") } returns MutableStateFlow<Note?>(null)
-        val savedStateHandle = SavedStateHandle(mapOf(Routes.EDITOR_ARG_NOTE_ID to "note-1"))
+        val savedStateHandle = SavedStateHandle(route = EditorRoute("note-1"))
         viewModel = NoteEditorViewModel(repository, syncScheduler, savedStateHandle)
     }
 

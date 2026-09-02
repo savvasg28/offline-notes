@@ -8,15 +8,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
 import com.savvasg.offlinenotes.presentation.conflict.ConflictResolutionScreen
-import com.savvasg.offlinenotes.presentation.debug.DebugPanelScreen
+import com.savvasg.offlinenotes.presentation.conflict.ConflictRoute
+import com.savvasg.offlinenotes.presentation.debug.debugDestinations
+import com.savvasg.offlinenotes.presentation.debug.openDebugPanel
+import com.savvasg.offlinenotes.presentation.editor.EditorRoute
 import com.savvasg.offlinenotes.presentation.editor.NoteEditorScreen
-import com.savvasg.offlinenotes.presentation.navigation.Routes
+import com.savvasg.offlinenotes.presentation.notelist.NotesListRoute
 import com.savvasg.offlinenotes.presentation.notelist.NotesListScreen
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -37,34 +38,26 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun OfflineNotesRoot() {
     val navController = rememberNavController()
-    NavHost(navController = navController, startDestination = Routes.NOTES_LIST) {
-        composable(Routes.NOTES_LIST) {
+    NavHost(navController = navController, startDestination = NotesListRoute) {
+        composable<NotesListRoute> {
             NotesListScreen(
-                onNoteClick = { id -> navController.navigate(Routes.editor(id)) },
-                onNewNote = { id -> navController.navigate(Routes.editor(id)) },
-                onOpenDebugPanel = { navController.navigate(Routes.DEBUG_PANEL) },
+                onNoteClick = { id -> navController.navigate(EditorRoute(id)) },
+                onNewNote = { id -> navController.navigate(EditorRoute(id)) },
+                onOpenDebugPanel = openDebugPanel?.let { open -> { open(navController) } },
             )
         }
-        composable(
-            route = Routes.EDITOR,
-            arguments = listOf(navArgument(Routes.EDITOR_ARG_NOTE_ID) { type = NavType.StringType }),
-        ) {
+        composable<EditorRoute> {
             NoteEditorScreen(
                 onBack = { navController.popBackStack() },
-                onResolveConflict = { id -> navController.navigate(Routes.conflict(id)) },
+                onResolveConflict = { id -> navController.navigate(ConflictRoute(id)) },
             )
         }
-        composable(
-            route = Routes.CONFLICT,
-            arguments = listOf(navArgument(Routes.CONFLICT_ARG_NOTE_ID) { type = NavType.StringType }),
-        ) {
+        composable<ConflictRoute> {
             ConflictResolutionScreen(
                 onResolved = { navController.popBackStack() },
                 onBack = { navController.popBackStack() },
             )
         }
-        composable(Routes.DEBUG_PANEL) {
-            DebugPanelScreen(onBack = { navController.popBackStack() })
-        }
+        debugDestinations(onBack = { navController.popBackStack() })
     }
 }

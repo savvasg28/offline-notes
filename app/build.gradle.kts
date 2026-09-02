@@ -123,6 +123,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit)
+    testImplementation(libs.androidx.navigation.testing)
     testImplementation(libs.androidx.room.testing)
     testImplementation(libs.androidx.work.testing)
     testImplementation(libs.kotlinx.coroutines.test)

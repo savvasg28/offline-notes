@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.savvasg.offlinenotes.domain.model.SyncState
 import com.savvasg.offlinenotes.domain.repository.NoteRepository
-import com.savvasg.offlinenotes.presentation.navigation.Routes
+import androidx.navigation.toRoute
 import com.savvasg.offlinenotes.sync.SyncScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -37,7 +37,7 @@ class NoteEditorViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
-    val noteId: String = checkNotNull(savedStateHandle[Routes.EDITOR_ARG_NOTE_ID])
+    val noteId: String = savedStateHandle.toRoute<EditorRoute>().noteId
 
     private val _title = MutableStateFlow("")
     val title: StateFlow<String> = _title.asStateFlow()

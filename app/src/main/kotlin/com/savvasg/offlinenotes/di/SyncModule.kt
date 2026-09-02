@@ -2,9 +2,6 @@ package com.savvasg.offlinenotes.di
 
 import android.content.Context
 import androidx.work.WorkManager
-import com.savvasg.offlinenotes.data.remote.SelectableTransport
-import com.savvasg.offlinenotes.data.remote.SyncTransport
-import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -12,18 +9,11 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
+// SyncTransport is bound per build variant — see TransportModule in src/debug and src/release.
 @Module
 @InstallIn(SingletonComponent::class)
-abstract class SyncModule {
-    // FakeTransport is the zero-setup default; SelectableTransport is what SyncEngine actually
-    // sees — it picks FakeTransport vs HttpTransport per TransportSettings, driven by the debug
-    // panel, without SyncEngine ever knowing a choice is being made.
-    @Binds
-    abstract fun bindSyncTransport(impl: SelectableTransport): SyncTransport
-
-    companion object {
-        @Provides
-        @Singleton
-        fun provideWorkManager(@ApplicationContext context: Context): WorkManager = WorkManager.getInstance(context)
-    }
+object SyncModule {
+    @Provides
+    @Singleton
+    fun provideWorkManager(@ApplicationContext context: Context): WorkManager = WorkManager.getInstance(context)
 }
