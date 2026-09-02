@@ -1,13 +1,13 @@
-package com.savvasg.offlinenotes.sync.transport.fake
+package com.savvasg.offlinenotes.data.remote.fake
 
-import com.savvasg.offlinenotes.sync.transport.AuthFailureException
-import com.savvasg.offlinenotes.sync.transport.DeltaPage
-import com.savvasg.offlinenotes.sync.transport.OpResult
-import com.savvasg.offlinenotes.sync.transport.OutgoingOp
-import com.savvasg.offlinenotes.sync.transport.RateLimitException
-import com.savvasg.offlinenotes.sync.transport.SimulatedNetworkException
-import com.savvasg.offlinenotes.sync.transport.SyncTokenExpiredException
-import com.savvasg.offlinenotes.sync.transport.SyncTransport
+import com.savvasg.offlinenotes.data.remote.dto.AuthFailureException
+import com.savvasg.offlinenotes.data.remote.dto.DeltaPage
+import com.savvasg.offlinenotes.data.remote.dto.OpResult
+import com.savvasg.offlinenotes.data.remote.dto.OutgoingOp
+import com.savvasg.offlinenotes.data.remote.dto.RateLimitException
+import com.savvasg.offlinenotes.data.remote.dto.SimulatedNetworkException
+import com.savvasg.offlinenotes.data.remote.dto.SyncTokenExpiredException
+import com.savvasg.offlinenotes.data.remote.SyncTransport
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton

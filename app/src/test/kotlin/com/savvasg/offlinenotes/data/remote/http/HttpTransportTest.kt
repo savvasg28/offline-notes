@@ -1,13 +1,14 @@
-package com.savvasg.offlinenotes.sync.transport.http
+package com.savvasg.offlinenotes.data.remote.http
 
 import com.google.common.truth.Truth.assertThat
-import com.savvasg.offlinenotes.data.local.OpType
-import com.savvasg.offlinenotes.sync.transport.AuthFailureException
-import com.savvasg.offlinenotes.sync.transport.OpResult
-import com.savvasg.offlinenotes.sync.transport.OutgoingOp
-import com.savvasg.offlinenotes.sync.transport.RateLimitException
-import com.savvasg.offlinenotes.sync.transport.SimulatedNetworkException
-import com.savvasg.offlinenotes.sync.transport.SyncTokenExpiredException
+import com.savvasg.offlinenotes.data.remote.dto.AuthFailureException
+import com.savvasg.offlinenotes.data.remote.dto.DeltaPage
+import com.savvasg.offlinenotes.data.remote.dto.OpResult
+import com.savvasg.offlinenotes.data.remote.dto.OutgoingOp
+import com.savvasg.offlinenotes.data.remote.dto.RateLimitException
+import com.savvasg.offlinenotes.data.remote.dto.SimulatedNetworkException
+import com.savvasg.offlinenotes.data.remote.dto.SyncTokenExpiredException
+import com.savvasg.offlinenotes.domain.model.OpType
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType

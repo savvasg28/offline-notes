@@ -1,11 +1,11 @@
 package com.savvasg.offlinenotes.sync
 
-import com.savvasg.offlinenotes.data.local.ConflictPayload
-import com.savvasg.offlinenotes.data.local.FrozenOutboxOp
-import com.savvasg.offlinenotes.data.local.RemoteNoteChange
-import com.savvasg.offlinenotes.sync.transport.OpResult
-import com.savvasg.offlinenotes.sync.transport.OutgoingOp
-import com.savvasg.offlinenotes.sync.transport.RemoteNote
+import com.savvasg.offlinenotes.domain.model.ConflictPayload
+import com.savvasg.offlinenotes.domain.model.FrozenOutboxOp
+import com.savvasg.offlinenotes.domain.model.RemoteNoteChange
+import com.savvasg.offlinenotes.data.remote.dto.OpResult
+import com.savvasg.offlinenotes.data.remote.dto.OutgoingOp
+import com.savvasg.offlinenotes.data.remote.dto.RemoteNote
 
 fun FrozenOutboxOp.toOutgoingOp() = OutgoingOp(
     opId = opId,

@@ -32,7 +32,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.savvasg.offlinenotes.data.local.SyncState
+import com.savvasg.offlinenotes.domain.model.SyncState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

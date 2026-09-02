@@ -1,4 +1,4 @@
-package com.savvasg.offlinenotes.data.local
+package com.savvasg.offlinenotes.data.local.dao
 
 import androidx.room.Dao
 import androidx.room.Query
@@ -6,6 +6,9 @@ import androidx.room.RawQuery
 import androidx.room.RoomRawQuery
 import androidx.room.Upsert
 import androidx.sqlite.SQLiteStatement
+import com.savvasg.offlinenotes.data.local.database.OfflineNotesDatabase
+import com.savvasg.offlinenotes.data.local.entity.NoteEntity
+import com.savvasg.offlinenotes.domain.model.SyncState
 import kotlinx.coroutines.flow.Flow
 
 @Dao

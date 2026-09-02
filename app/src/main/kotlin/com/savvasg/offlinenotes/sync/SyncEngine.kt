@@ -2,10 +2,10 @@ package com.savvasg.offlinenotes.sync
 
 import com.savvasg.offlinenotes.domain.repository.NoteSyncOperations
 import com.savvasg.offlinenotes.domain.repository.OpAcknowledgement
-import com.savvasg.offlinenotes.sync.transport.OpResult
-import com.savvasg.offlinenotes.sync.transport.SyncTokenExpiredException
-import com.savvasg.offlinenotes.sync.transport.SyncTransport
-import com.savvasg.offlinenotes.sync.transport.TransportException
+import com.savvasg.offlinenotes.data.remote.dto.OpResult
+import com.savvasg.offlinenotes.data.remote.dto.SyncTokenExpiredException
+import com.savvasg.offlinenotes.data.remote.SyncTransport
+import com.savvasg.offlinenotes.data.remote.dto.TransportException
 import javax.inject.Inject
 
 /** What the caller (the WorkManager worker) should do next, per §6 step 5. */

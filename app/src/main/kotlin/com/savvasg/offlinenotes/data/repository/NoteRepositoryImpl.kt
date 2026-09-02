@@ -1,15 +1,15 @@
 package com.savvasg.offlinenotes.data.repository
 
-import com.savvasg.offlinenotes.data.local.ConflictDao
-import com.savvasg.offlinenotes.data.local.ConflictPayload
-import com.savvasg.offlinenotes.data.local.FrozenOutboxOp
-import com.savvasg.offlinenotes.data.local.NoteDao
-import com.savvasg.offlinenotes.data.local.NoteEntity
-import com.savvasg.offlinenotes.data.local.NoteTransactions
-import com.savvasg.offlinenotes.data.local.OutboxDao
-import com.savvasg.offlinenotes.data.local.RemoteNoteChange
-import com.savvasg.offlinenotes.data.local.SyncMetaDao
-import com.savvasg.offlinenotes.data.local.searchActiveNotes
+import com.savvasg.offlinenotes.data.local.dao.ConflictDao
+import com.savvasg.offlinenotes.domain.model.ConflictPayload
+import com.savvasg.offlinenotes.domain.model.FrozenOutboxOp
+import com.savvasg.offlinenotes.data.local.dao.NoteDao
+import com.savvasg.offlinenotes.data.local.entity.NoteEntity
+import com.savvasg.offlinenotes.data.local.database.NoteTransactions
+import com.savvasg.offlinenotes.data.local.dao.OutboxDao
+import com.savvasg.offlinenotes.domain.model.RemoteNoteChange
+import com.savvasg.offlinenotes.data.local.dao.SyncMetaDao
+import com.savvasg.offlinenotes.data.local.dao.searchActiveNotes
 import com.savvasg.offlinenotes.domain.model.Note
 import com.savvasg.offlinenotes.domain.model.NoteConflict
 import com.savvasg.offlinenotes.domain.model.NoteListItem

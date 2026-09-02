@@ -3,7 +3,7 @@ package com.savvasg.offlinenotes.presentation.editor
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.savvasg.offlinenotes.data.local.SyncState
+import com.savvasg.offlinenotes.domain.model.SyncState
 import com.savvasg.offlinenotes.domain.repository.NoteRepository
 import com.savvasg.offlinenotes.presentation.navigation.Routes
 import com.savvasg.offlinenotes.sync.SyncScheduler

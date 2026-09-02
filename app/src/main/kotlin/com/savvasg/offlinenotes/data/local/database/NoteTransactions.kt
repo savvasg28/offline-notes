@@ -1,7 +1,21 @@
-package com.savvasg.offlinenotes.data.local
+package com.savvasg.offlinenotes.data.local.database
 
 import androidx.room.immediateTransaction
 import androidx.room.useWriterConnection
+import com.savvasg.offlinenotes.data.local.dao.ConflictDao
+import com.savvasg.offlinenotes.data.local.dao.NoteDao
+import com.savvasg.offlinenotes.data.local.dao.OutboxDao
+import com.savvasg.offlinenotes.data.local.dao.SyncMetaDao
+import com.savvasg.offlinenotes.data.local.entity.NoteConflictEntity
+import com.savvasg.offlinenotes.data.local.entity.NoteEntity
+import com.savvasg.offlinenotes.data.local.entity.OutboxEntity
+import com.savvasg.offlinenotes.data.local.entity.OutboxStatus
+import com.savvasg.offlinenotes.data.local.entity.SyncMetaEntity
+import com.savvasg.offlinenotes.domain.model.ConflictPayload
+import com.savvasg.offlinenotes.domain.model.FrozenOutboxOp
+import com.savvasg.offlinenotes.domain.model.OpType
+import com.savvasg.offlinenotes.domain.model.RemoteNoteChange
+import com.savvasg.offlinenotes.domain.model.SyncState
 import java.util.UUID
 import javax.inject.Inject
 

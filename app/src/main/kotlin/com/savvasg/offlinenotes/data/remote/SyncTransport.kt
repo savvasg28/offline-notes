@@ -1,7 +1,11 @@
-package com.savvasg.offlinenotes.sync.transport
+package com.savvasg.offlinenotes.data.remote
+
+import com.savvasg.offlinenotes.data.remote.dto.OutgoingOp
+import com.savvasg.offlinenotes.data.remote.dto.OpResult
+import com.savvasg.offlinenotes.data.remote.dto.DeltaPage
 
 /**
- * The transport contract. Both [FakeTransport][com.savvasg.offlinenotes.sync.transport.fake.FakeTransport]
+ * The transport contract. Both [FakeTransport][com.savvasg.offlinenotes.data.remote.fake.FakeTransport]
  * and `HttpTransport` implement this — one contract, two ways to reach it: a scriptable local
  * stub for zero-setup dev/tests, and a real HTTP client for whatever server (or Mockoon mock)
  * actually implements the semantics on the other end.

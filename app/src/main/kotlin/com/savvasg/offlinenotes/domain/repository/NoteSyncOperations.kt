@@ -1,8 +1,8 @@
 package com.savvasg.offlinenotes.domain.repository
 
-import com.savvasg.offlinenotes.data.local.ConflictPayload
-import com.savvasg.offlinenotes.data.local.FrozenOutboxOp
-import com.savvasg.offlinenotes.data.local.RemoteNoteChange
+import com.savvasg.offlinenotes.domain.model.ConflictPayload
+import com.savvasg.offlinenotes.domain.model.FrozenOutboxOp
+import com.savvasg.offlinenotes.domain.model.RemoteNoteChange
 
 /** Result of a pushed op that isn't a conflict — see [NoteSyncOperations.applyResult]. */
 sealed interface OpAcknowledgement {

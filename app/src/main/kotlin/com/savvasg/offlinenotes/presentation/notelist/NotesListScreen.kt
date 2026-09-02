@@ -36,7 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.savvasg.offlinenotes.data.local.SyncState
+import com.savvasg.offlinenotes.domain.model.SyncState
 import com.savvasg.offlinenotes.domain.model.NoteListItem
 import java.text.DateFormat
 import java.util.Date

@@ -1,9 +1,12 @@
-package com.savvasg.offlinenotes.data.local
+package com.savvasg.offlinenotes.data.local.entity
 
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.savvasg.offlinenotes.data.local.database.NoteTransactions
+import com.savvasg.offlinenotes.data.local.database.OfflineNotesDatabase
+import com.savvasg.offlinenotes.domain.model.OpType
 
 /**
  * `baseVersion` is deliberately NOT a column here — it is resolved from [NoteEntity.serverVersion]

@@ -2,8 +2,8 @@ package com.savvasg.offlinenotes.di
 
 import android.content.Context
 import androidx.work.WorkManager
-import com.savvasg.offlinenotes.sync.transport.SelectableTransport
-import com.savvasg.offlinenotes.sync.transport.SyncTransport
+import com.savvasg.offlinenotes.data.remote.SelectableTransport
+import com.savvasg.offlinenotes.data.remote.SyncTransport
 import dagger.Binds
 import dagger.Module
 import dagger.Provides

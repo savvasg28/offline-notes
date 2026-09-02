@@ -1,4 +1,4 @@
-package com.savvasg.offlinenotes.data.local
+package com.savvasg.offlinenotes.data.local.database
 
 import android.content.Context
 import androidx.room.Room
@@ -7,6 +7,11 @@ import androidx.room.useWriterConnection
 import androidx.sqlite.SQLiteException
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
+import com.savvasg.offlinenotes.data.local.entity.OutboxStatus
+import com.savvasg.offlinenotes.domain.model.ConflictPayload
+import com.savvasg.offlinenotes.domain.model.OpType
+import com.savvasg.offlinenotes.domain.model.RemoteNoteChange
+import com.savvasg.offlinenotes.domain.model.SyncState
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before

@@ -2,11 +2,11 @@ package com.savvasg.offlinenotes.di
 
 import android.content.Context
 import androidx.room.Room
-import com.savvasg.offlinenotes.data.local.ConflictDao
-import com.savvasg.offlinenotes.data.local.NoteDao
-import com.savvasg.offlinenotes.data.local.OfflineNotesDatabase
-import com.savvasg.offlinenotes.data.local.OutboxDao
-import com.savvasg.offlinenotes.data.local.SyncMetaDao
+import com.savvasg.offlinenotes.data.local.dao.ConflictDao
+import com.savvasg.offlinenotes.data.local.dao.NoteDao
+import com.savvasg.offlinenotes.data.local.database.OfflineNotesDatabase
+import com.savvasg.offlinenotes.data.local.dao.OutboxDao
+import com.savvasg.offlinenotes.data.local.dao.SyncMetaDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

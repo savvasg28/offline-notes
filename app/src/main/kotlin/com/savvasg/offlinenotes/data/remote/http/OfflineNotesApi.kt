@@ -1,8 +1,8 @@
-package com.savvasg.offlinenotes.sync.transport.http
+package com.savvasg.offlinenotes.data.remote.http
 
-import com.savvasg.offlinenotes.sync.transport.DeltaPage
-import com.savvasg.offlinenotes.sync.transport.OpResult
-import com.savvasg.offlinenotes.sync.transport.OutgoingOp
+import com.savvasg.offlinenotes.data.remote.dto.DeltaPage
+import com.savvasg.offlinenotes.data.remote.dto.OpResult
+import com.savvasg.offlinenotes.data.remote.dto.OutgoingOp
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET

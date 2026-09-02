@@ -1,6 +1,6 @@
 package com.savvasg.offlinenotes.domain.model
 
-import com.savvasg.offlinenotes.data.local.SyncState
+import com.savvasg.offlinenotes.domain.model.SyncState
 
 /** Full note, for the editor screen. */
 data class Note(

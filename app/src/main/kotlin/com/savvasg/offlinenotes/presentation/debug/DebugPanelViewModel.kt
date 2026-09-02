@@ -2,14 +2,15 @@ package com.savvasg.offlinenotes.presentation.debug
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.savvasg.offlinenotes.data.local.NoteDao
-import com.savvasg.offlinenotes.data.local.NoteEntity
-import com.savvasg.offlinenotes.data.local.OutboxDao
-import com.savvasg.offlinenotes.data.local.OutboxEntity
-import com.savvasg.offlinenotes.data.local.SyncMetaDao
+import com.savvasg.offlinenotes.data.local.dao.NoteDao
+import com.savvasg.offlinenotes.data.local.dao.OutboxDao
+import com.savvasg.offlinenotes.data.local.dao.SyncMetaDao
+import com.savvasg.offlinenotes.data.local.entity.NoteEntity
+import com.savvasg.offlinenotes.data.local.entity.OutboxEntity
+import com.savvasg.offlinenotes.data.remote.SyncTransport
+import com.savvasg.offlinenotes.data.remote.TransportSettings
+import com.savvasg.offlinenotes.data.remote.fake.FakeTransport
 import com.savvasg.offlinenotes.sync.SyncScheduler
-import com.savvasg.offlinenotes.sync.transport.TransportSettings
-import com.savvasg.offlinenotes.sync.transport.fake.FakeTransport
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
@@ -19,7 +20,7 @@ import kotlinx.coroutines.flow.stateIn
 /**
  * Backs the debug panel: failure injection, the outbox inspector, the current sync token, and
  * force-sync. Injects [FakeTransport] directly rather than going through
- * [com.savvasg.offlinenotes.sync.transport.SyncTransport] — these controls aren't part of the
+ * [com.savvasg.offlinenotes.data.remote.SyncTransport] — these controls aren't part of the
  * transport contract any real implementation would expose to callers, they're demo/test
  * scaffolding specific to the stub. (They have no effect when the debug panel's "Use HTTP
  * transport" toggle is on — that path is real HTTP against whatever Mockoon/real server is

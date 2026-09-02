@@ -34,8 +34,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.savvasg.offlinenotes.data.local.NoteEntity
-import com.savvasg.offlinenotes.data.local.OutboxEntity
+import com.savvasg.offlinenotes.data.local.entity.NoteEntity
+import com.savvasg.offlinenotes.data.local.entity.OutboxEntity
 
 /**
  * Failure injection, the outbox inspector, and the current sync token (§10) — "a reviewer should

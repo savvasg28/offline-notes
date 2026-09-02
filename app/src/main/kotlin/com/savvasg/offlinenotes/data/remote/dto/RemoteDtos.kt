@@ -1,13 +1,14 @@
-package com.savvasg.offlinenotes.sync.transport
+package com.savvasg.offlinenotes.data.remote.dto
 
-import com.savvasg.offlinenotes.data.local.OpType
+import com.savvasg.offlinenotes.data.remote.SyncTransport
+import com.savvasg.offlinenotes.domain.model.OpType
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
  * The wire contract [SyncTransport] implementations speak. This repo doesn't own backend
  * semantics — the app is a client against a contract, full stop. These types describe that
- * contract; nothing in this module implements it. [FakeTransport][com.savvasg.offlinenotes.sync.transport.fake.FakeTransport]
+ * contract; nothing in this module implements it. [FakeTransport][com.savvasg.offlinenotes.data.remote.fake.FakeTransport]
  * is a scriptable stub for local dev/tests, and `HttpTransport` talks to whatever real (or
  * Mockoon-mocked) server honours this shape.
  */

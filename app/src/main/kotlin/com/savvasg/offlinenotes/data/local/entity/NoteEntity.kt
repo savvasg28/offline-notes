@@ -1,8 +1,9 @@
-package com.savvasg.offlinenotes.data.local
+package com.savvasg.offlinenotes.data.local.entity
 
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.savvasg.offlinenotes.domain.model.SyncState
 
 /**
  * [serverVersion] is a sync watermark — the last version the server acked, and the base for the

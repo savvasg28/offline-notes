@@ -1,9 +1,17 @@
-package com.savvasg.offlinenotes.data.local
+package com.savvasg.offlinenotes.data.local.database
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.execSQL
+import com.savvasg.offlinenotes.data.local.dao.ConflictDao
+import com.savvasg.offlinenotes.data.local.dao.NoteDao
+import com.savvasg.offlinenotes.data.local.dao.OutboxDao
+import com.savvasg.offlinenotes.data.local.dao.SyncMetaDao
+import com.savvasg.offlinenotes.data.local.entity.NoteConflictEntity
+import com.savvasg.offlinenotes.data.local.entity.NoteEntity
+import com.savvasg.offlinenotes.data.local.entity.OutboxEntity
+import com.savvasg.offlinenotes.data.local.entity.SyncMetaEntity
 
 @Database(
     entities = [NoteEntity::class, OutboxEntity::class, NoteConflictEntity::class, SyncMetaEntity::class],

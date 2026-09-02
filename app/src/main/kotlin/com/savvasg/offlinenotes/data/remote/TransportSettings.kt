@@ -1,4 +1,4 @@
-package com.savvasg.offlinenotes.sync.transport
+package com.savvasg.offlinenotes.data.remote
 
 import javax.inject.Inject
 import javax.inject.Singleton

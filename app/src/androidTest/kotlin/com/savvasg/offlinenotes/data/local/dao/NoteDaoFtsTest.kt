@@ -1,10 +1,13 @@
-package com.savvasg.offlinenotes.data.local
+package com.savvasg.offlinenotes.data.local.dao
 
 import androidx.room.Room
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import com.savvasg.offlinenotes.data.local.database.OfflineNotesDatabase
+import com.savvasg.offlinenotes.data.local.entity.NoteEntity
+import com.savvasg.offlinenotes.domain.model.SyncState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -16,7 +19,7 @@ import org.junit.runner.RunWith
 /**
  * FTS5 DAO tests (§11), run on a real device/emulator: Robolectric's bundled SQLite lacks the
  * FTS5 extension (see [OfflineNotesDatabase.FTS_CALLBACK]'s kdoc), so search can only be verified
- * here — this is the one thing [com.savvasg.offlinenotes.data.local.NoteTransactionsTest] can't
+ * here — this is the one thing [com.savvasg.offlinenotes.data.local.database.NoteTransactionsTest] can't
  * cover.
  */
 @RunWith(AndroidJUnit4::class)

@@ -1,8 +1,11 @@
-package com.savvasg.offlinenotes.data.local
+package com.savvasg.offlinenotes.data.local.dao
 
 import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.Upsert
+import com.savvasg.offlinenotes.data.local.database.NoteTransactions
+import com.savvasg.offlinenotes.data.local.entity.OutboxEntity
+import com.savvasg.offlinenotes.data.local.entity.OutboxStatus
 import kotlinx.coroutines.flow.Flow
 
 @Dao

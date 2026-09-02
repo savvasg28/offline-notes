@@ -1,7 +1,10 @@
-package com.savvasg.offlinenotes.sync.transport
+package com.savvasg.offlinenotes.data.remote
 
-import com.savvasg.offlinenotes.sync.transport.fake.FakeTransport
-import com.savvasg.offlinenotes.sync.transport.http.HttpTransport
+import com.savvasg.offlinenotes.data.remote.dto.OutgoingOp
+import com.savvasg.offlinenotes.data.remote.dto.OpResult
+import com.savvasg.offlinenotes.data.remote.dto.DeltaPage
+import com.savvasg.offlinenotes.data.remote.fake.FakeTransport
+import com.savvasg.offlinenotes.data.remote.http.HttpTransport
 import javax.inject.Inject
 import javax.inject.Singleton
 

@@ -1,7 +1,7 @@
 package com.savvasg.offlinenotes.di
 
-import com.savvasg.offlinenotes.sync.transport.TransportSettings
-import com.savvasg.offlinenotes.sync.transport.http.OfflineNotesApi
+import com.savvasg.offlinenotes.data.remote.TransportSettings
+import com.savvasg.offlinenotes.data.remote.http.OfflineNotesApi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
