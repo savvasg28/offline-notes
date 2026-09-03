@@ -25,9 +25,11 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.savvasg.offlinenotes.R
 
 @Composable
 fun ConflictResolutionScreen(
@@ -64,10 +66,10 @@ fun ConflictResolutionContent(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("Resolve conflict") },
+                title = { Text(stringResource(R.string.conflict_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
             )
@@ -76,7 +78,7 @@ fun ConflictResolutionContent(
         val conflict = uiState.conflict
         if (conflict == null) {
             Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
-                Text("No conflict to resolve.", style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.conflict_none), style = MaterialTheme.typography.bodyLarge)
             }
             return@Scaffold
         }
@@ -88,49 +90,48 @@ fun ConflictResolutionContent(
         ) {
             item {
                 Text(
-                    "This note changed on another device while you had local edits pending. " +
-                        "Compare the three versions below, then keep one side or edit the result manually.",
+                    stringResource(R.string.conflict_explanation),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            item { VersionCard(label = "Local (yours)", title = conflict.localTitle, body = conflict.localBody) }
+            item { VersionCard(label = stringResource(R.string.conflict_version_local), title = conflict.localTitle, body = conflict.localBody) }
             item {
                 if (conflict.baseTitle != null && conflict.baseBody != null) {
-                    VersionCard(label = "Base (common ancestor)", title = conflict.baseTitle, body = conflict.baseBody)
+                    VersionCard(label = stringResource(R.string.conflict_version_base), title = conflict.baseTitle, body = conflict.baseBody)
                 } else {
                     Text(
-                        "No common history available — showing local vs. remote only.",
+                        stringResource(R.string.conflict_no_base),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
-            item { VersionCard(label = "Remote (other device)", title = conflict.remoteTitle, body = conflict.remoteBody) }
+            item { VersionCard(label = stringResource(R.string.conflict_version_remote), title = conflict.remoteTitle, body = conflict.remoteBody) }
 
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Resolution", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.conflict_resolution_heading), style = MaterialTheme.typography.titleMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = onUseMine) { Text("Keep mine") }
-                        OutlinedButton(onClick = onUseTheirs) { Text("Keep theirs") }
+                        OutlinedButton(onClick = onUseMine) { Text(stringResource(R.string.conflict_keep_mine)) }
+                        OutlinedButton(onClick = onUseTheirs) { Text(stringResource(R.string.conflict_keep_theirs)) }
                     }
                     TextField(
                         value = uiState.draftTitle,
                         onValueChange = onDraftTitleChange,
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Title") },
+                        placeholder = { Text(stringResource(R.string.note_title_hint)) },
                         singleLine = true,
                     )
                     TextField(
                         value = uiState.draftBody,
                         onValueChange = onDraftBodyChange,
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Note") },
+                        placeholder = { Text(stringResource(R.string.note_body_hint)) },
                         minLines = 4,
                     )
                     Button(onClick = onResolve, modifier = Modifier.fillMaxWidth()) {
-                        Text("Resolve")
+                        Text(stringResource(R.string.action_resolve))
                     }
                 }
             }
@@ -143,7 +144,7 @@ private fun VersionCard(label: String, title: String, body: String) {
     Card(colors = CardDefaults.cardColors()) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-            Text(title.ifBlank { "Untitled" }, style = MaterialTheme.typography.titleSmall)
+            Text(title.ifBlank { stringResource(R.string.note_untitled) }, style = MaterialTheme.typography.titleSmall)
             if (body.isNotBlank()) {
                 Text(body, style = MaterialTheme.typography.bodyMedium)
             }

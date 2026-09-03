@@ -1,4 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Offline Notes</string>
+
+    <!-- Shared -->
+    <string name="action_back">Back</string>
+    <string name="action_resolve">Resolve</string>
+    <string name="note_untitled">Untitled</string>
+    <string name="note_title_hint">Title</string>
+    <string name="note_body_hint">Note</string>
+
+    <!-- Notes list -->
+    <string name="notes_list_title">Offline Notes</string>
+    <string name="notes_list_search_hint">Search notes</string>
+    <string name="notes_list_empty">No notes yet — tap + to create one</string>
+    <string name="notes_list_no_matches">No matches</string>
+    <string name="notes_list_new_note">New note</string>
+    <string name="notes_list_delete_note">Delete</string>
+    <string name="notes_list_open_debug_panel">Debug panel</string>
+
+    <!-- Editor -->
+    <string name="editor_conflict_banner">This note changed on another device.</string>
+
+    <!-- Conflict resolution -->
+    <string name="conflict_title">Resolve conflict</string>
+    <string name="conflict_none">No conflict to resolve.</string>
+    <string name="conflict_explanation">This note changed on another device while you had local edits pending. Compare the three versions below, then keep one side or edit the result manually.</string>
+    <string name="conflict_version_local">Local (yours)</string>
+    <string name="conflict_version_base">Base (common ancestor)</string>
+    <string name="conflict_version_remote">Remote (other device)</string>
+    <string name="conflict_no_base">No common history available — showing local vs. remote only.</string>
+    <string name="conflict_resolution_heading">Resolution</string>
+    <string name="conflict_keep_mine">Keep mine</string>
+    <string name="conflict_keep_theirs">Keep theirs</string>
 </resources>

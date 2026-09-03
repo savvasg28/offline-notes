@@ -33,9 +33,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.savvasg.offlinenotes.R
 import com.savvasg.offlinenotes.domain.model.NoteListItem
 import com.savvasg.offlinenotes.domain.model.SyncState
 import java.text.DateFormat
@@ -75,12 +77,12 @@ fun NotesListContent(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("Offline Notes") },
+                title = { Text(stringResource(R.string.notes_list_title)) },
                 actions = {
                     // Absent in release builds, where the debug panel isn't compiled in at all.
                     if (onOpenDebugPanel != null) {
                         IconButton(onClick = onOpenDebugPanel) {
-                            Icon(Icons.Default.BugReport, contentDescription = "Debug panel")
+                            Icon(Icons.Default.BugReport, contentDescription = stringResource(R.string.notes_list_open_debug_panel))
                         }
                     }
                 },
@@ -88,7 +90,7 @@ fun NotesListContent(
         },
         floatingActionButton = {
             FloatingActionButton(onClick = onNewNote) {
-                Icon(Icons.Default.Add, contentDescription = "New note")
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.notes_list_new_note))
             }
         },
     ) { padding ->
@@ -97,7 +99,7 @@ fun NotesListContent(
                 value = uiState.searchQuery,
                 onValueChange = onSearchQueryChange,
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
-                placeholder = { Text("Search notes") },
+                placeholder = { Text(stringResource(R.string.notes_list_search_hint)) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 singleLine = true,
             )
@@ -105,7 +107,9 @@ fun NotesListContent(
             if (uiState.notes.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
-                        if (uiState.searchQuery.isBlank()) "No notes yet — tap + to create one" else "No matches",
+                        stringResource(
+                            if (uiState.searchQuery.isBlank()) R.string.notes_list_empty else R.string.notes_list_no_matches,
+                        ),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -139,14 +143,14 @@ private fun NoteRow(note: NoteListItem, onClick: () -> Unit, onDelete: () -> Uni
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        note.title.ifBlank { "Untitled" },
+                        note.title.ifBlank { stringResource(R.string.note_untitled) },
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(end = 8.dp),
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         SyncStateDot(note.syncState)
                         IconButton(onClick = onDelete) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete")
+                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.notes_list_delete_note))
                         }
                     }
                 }

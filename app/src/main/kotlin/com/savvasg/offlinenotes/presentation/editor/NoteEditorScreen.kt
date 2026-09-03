@@ -27,12 +27,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.savvasg.offlinenotes.R
 import com.savvasg.offlinenotes.domain.model.SyncState
 
 @Composable
@@ -84,7 +86,7 @@ fun NoteEditorContent(
                 title = {},
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
             )
@@ -98,7 +100,7 @@ fun NoteEditorContent(
                 value = uiState.title,
                 onValueChange = onTitleChange,
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Title") },
+                placeholder = { Text(stringResource(R.string.note_title_hint)) },
                 textStyle = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                 colors = seamlessTextFieldColors(),
                 singleLine = true,
@@ -107,7 +109,7 @@ fun NoteEditorContent(
                 value = uiState.body,
                 onValueChange = onBodyChange,
                 modifier = Modifier.fillMaxSize(),
-                placeholder = { Text("Note") },
+                placeholder = { Text(stringResource(R.string.note_body_hint)) },
                 textStyle = MaterialTheme.typography.bodyLarge,
                 colors = seamlessTextFieldColors(),
             )
@@ -134,10 +136,10 @@ private fun ConflictBanner(onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            "This note changed on another device.",
+            stringResource(R.string.editor_conflict_banner),
             color = MaterialTheme.colorScheme.onErrorContainer,
             style = MaterialTheme.typography.bodyMedium,
         )
-        Button(onClick = onClick) { Text("Resolve") }
+        Button(onClick = onClick) { Text(stringResource(R.string.action_resolve)) }
     }
 }

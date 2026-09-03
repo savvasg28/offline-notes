@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug-panel strings. This source set is not part of a release build. -->
+<resources>
+    <string name="debug_panel_title">Debug panel</string>
+    <string name="debug_sync_token_label">Current sync token</string>
+    <string name="debug_sync_token_none">(never synced)</string>
+    <string name="debug_force_sync">Force sync now</string>
+
+    <string name="debug_section_transport">Transport</string>
+    <string name="debug_use_http_transport">Use HTTP transport</string>
+    <string name="debug_base_url_label">Server base URL</string>
+    <string name="debug_base_url_help">Emulator: 10.0.2.2 · physical device: host\'s LAN IP</string>
+
+    <string name="debug_section_global_failures">Global failure injection</string>
+    <string name="debug_add_latency">Add latency (0.5-2s)</string>
+    <string name="debug_clear_latency">Clear latency</string>
+    <string name="debug_expire_token">Expire sync token</string>
+    <string name="debug_force_rate_limit">Force rate limit (next call)</string>
+    <string name="debug_force_auth_failure">Force auth failure (next call)</string>
+
+    <string name="debug_section_per_note_failures">Per-note failure injection</string>
+    <string name="debug_no_notes">No notes yet.</string>
+    <string name="debug_force_conflict">Force conflict (next push)</string>
+    <string name="debug_force_rejection">Force rejection (next push)</string>
+
+    <plurals name="debug_outbox_inspector_title">
+        <item quantity="one">Outbox inspector (%1$d op)</item>
+        <item quantity="other">Outbox inspector (%1$d ops)</item>
+    </plurals>
+    <string name="debug_outbox_empty">Outbox is empty — everything is synced.</string>
+    <string name="debug_outbox_op_header">%1$s  %2$s</string>
+    <string name="debug_outbox_op_detail">note %1$s · attempt %2$d</string>
+    <string name="debug_drop_next_response">Drop next response for this op</string>
+</resources>

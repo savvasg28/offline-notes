@@ -250,7 +250,8 @@ in the design above where it would attach.
 **App:** Kotlin 2.2, Compose, Material 3, Room 2.8 (BundledSQLiteDriver — see below), WorkManager,
 Hilt, Coroutines/Flow, Retrofit/OkHttp + kotlinx-serialization.
 **Mock backend:** [Mockoon](mockoon/) (static/rule-based HTTP mocks) for the real-HTTP demo path;
-a scriptable stub (`FakeTransport`) for the zero-setup default.
+a scriptable stub (`FakeTransport`) for the zero-setup default. The contract both answer to is
+specified in [`openapi/offline-notes.yaml`](openapi/offline-notes.yaml).
 **Test:** JUnit, Robolectric, AndroidX Test, Turbine-compatible coroutines-test, MockWebServer,
 `WorkManagerTestInitHelper`, MockK, Truth.
 
