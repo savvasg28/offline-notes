@@ -36,9 +36,7 @@ fun ConflictResolutionScreen(
     onBack: () -> Unit,
     viewModel: ConflictResolutionViewModel = hiltViewModel(),
 ) {
-    val conflict by viewModel.conflict.collectAsStateWithLifecycle()
-    val draftTitle by viewModel.draftTitle.collectAsStateWithLifecycle()
-    val draftBody by viewModel.draftBody.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -52,7 +50,7 @@ fun ConflictResolutionScreen(
             )
         },
     ) { padding ->
-        val current = conflict
+        val current = uiState.conflict
         if (current == null) {
             Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
                 Text("No conflict to resolve.", style = MaterialTheme.typography.bodyLarge)
@@ -95,14 +93,14 @@ fun ConflictResolutionScreen(
                         OutlinedButton(onClick = viewModel::useTheirs) { Text("Keep theirs") }
                     }
                     TextField(
-                        value = draftTitle ?: current.localTitle,
+                        value = uiState.draftTitle,
                         onValueChange = viewModel::onDraftTitleChange,
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("Title") },
                         singleLine = true,
                     )
                     TextField(
-                        value = draftBody ?: current.localBody,
+                        value = uiState.draftBody,
                         onValueChange = viewModel::onDraftBodyChange,
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("Note") },

@@ -41,9 +41,7 @@ fun NoteEditorScreen(
     onResolveConflict: (String) -> Unit,
     viewModel: NoteEditorViewModel = hiltViewModel(),
 ) {
-    val title by viewModel.title.collectAsStateWithLifecycle()
-    val body by viewModel.body.collectAsStateWithLifecycle()
-    val syncState by viewModel.syncState.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     // Editor close / app background (§6): flush immediately rather than waiting out the
     // autosave debounce, so nothing typed in the last ~800ms is left un-persisted.
@@ -73,11 +71,11 @@ fun NoteEditorScreen(
         },
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp)) {
-            if (syncState == SyncState.CONFLICT) {
+            if (uiState.syncState == SyncState.CONFLICT) {
                 ConflictBanner(onClick = { onResolveConflict(viewModel.noteId) })
             }
             TextField(
-                value = title,
+                value = uiState.title,
                 onValueChange = viewModel::onTitleChange,
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("Title") },
@@ -91,7 +89,7 @@ fun NoteEditorScreen(
                 singleLine = true,
             )
             TextField(
-                value = body,
+                value = uiState.body,
                 onValueChange = viewModel::onBodyChange,
                 modifier = Modifier.fillMaxSize(),
                 placeholder = { Text("Note") },

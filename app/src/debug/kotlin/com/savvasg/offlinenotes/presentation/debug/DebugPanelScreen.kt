@@ -48,11 +48,7 @@ fun DebugPanelScreen(
     onBack: () -> Unit,
     viewModel: DebugPanelViewModel = hiltViewModel(),
 ) {
-    val outboxOps by viewModel.outboxOps.collectAsStateWithLifecycle()
-    val syncToken by viewModel.syncToken.collectAsStateWithLifecycle()
-    val activeNotes by viewModel.activeNotes.collectAsStateWithLifecycle()
-    val useHttpTransport by viewModel.transportSettings.useHttpTransport.collectAsStateWithLifecycle()
-    val baseUrl by viewModel.transportSettings.baseUrl.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -71,15 +67,15 @@ fun DebugPanelScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            item { SyncStatusSection(syncToken = syncToken, onForceSync = viewModel::forceSyncNow) }
+            item { SyncStatusSection(syncToken = uiState.syncToken, onForceSync = viewModel::forceSyncNow) }
 
             item { SectionTitle("Transport (§9)") }
             item {
                 TransportSection(
-                    useHttpTransport = useHttpTransport,
-                    baseUrl = baseUrl,
-                    onUseHttpTransportChange = viewModel.transportSettings::setUseHttpTransport,
-                    onBaseUrlChange = viewModel.transportSettings::setBaseUrl,
+                    useHttpTransport = uiState.useHttpTransport,
+                    baseUrl = uiState.baseUrl,
+                    onUseHttpTransportChange = viewModel::setUseHttpTransport,
+                    onBaseUrlChange = viewModel::setBaseUrl,
                 )
             }
 
@@ -95,18 +91,18 @@ fun DebugPanelScreen(
             }
 
             item { SectionTitle("Per-note failure injection") }
-            if (activeNotes.isEmpty()) {
+            if (uiState.activeNotes.isEmpty()) {
                 item { Text("No notes yet.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
-            items(activeNotes, key = { it.id }) { note ->
+            items(uiState.activeNotes, key = { it.id }) { note ->
                 NoteActionsCard(note = note, viewModel = viewModel)
             }
 
-            item { SectionTitle("Outbox inspector (${outboxOps.size} op${if (outboxOps.size == 1) "" else "s"})") }
-            if (outboxOps.isEmpty()) {
+            item { SectionTitle("Outbox inspector (${uiState.outboxOps.size} op${if (uiState.outboxOps.size == 1) "" else "s"})") }
+            if (uiState.outboxOps.isEmpty()) {
                 item { Text("Outbox is empty — everything is synced.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
-            items(outboxOps, key = { it.opId }) { op ->
+            items(uiState.outboxOps, key = { it.opId }) { op ->
                 OutboxRow(op = op, onDropNextResponse = { viewModel.dropNextResponseFor(op.opId) })
             }
         }

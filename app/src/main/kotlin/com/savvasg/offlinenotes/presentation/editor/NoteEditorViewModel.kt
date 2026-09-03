@@ -3,32 +3,35 @@ package com.savvasg.offlinenotes.presentation.editor
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.navigation.toRoute
 import com.savvasg.offlinenotes.domain.model.SyncState
 import com.savvasg.offlinenotes.domain.repository.NoteRepository
-import androidx.navigation.toRoute
 import com.savvasg.offlinenotes.sync.SyncScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+data class NoteEditorUiState(
+    val title: String = "",
+    val body: String = "",
+    /** Null until the note exists on disk; a note that was never created can't be in conflict. */
+    val syncState: SyncState? = null,
+)
+
 /**
- * No save button (§10) — autosave is debounced ~500ms-1s of typing pause (§5). [flush] persists
- * immediately, bypassing the debounce, for editor close / app background — the same signal §6
- * uses to trigger an expedited sync, so [flush] does both: durability (Room) is invariant 1's
- * job, freshness (a prompt push) is §6's.
+ * No save button: autosave is debounced on a typing pause, and [flush] persists immediately for
+ * editor close / app background, which also triggers an expedited sync.
  *
- * Both use `NonCancellable`: without it, a save launched right as the screen is popped could be
- * cancelled mid-flight when the NavBackStackEntry's ViewModelStore clears viewModelScope —
- * exactly the moment this method exists to protect against.
+ * Persistence runs in `NonCancellable`: without it a save launched as the screen is popped can be
+ * cancelled when the NavBackStackEntry's ViewModelStore clears viewModelScope — precisely the
+ * moment [flush] exists to protect against.
  */
 @HiltViewModel
 class NoteEditorViewModel @Inject constructor(
@@ -39,82 +42,68 @@ class NoteEditorViewModel @Inject constructor(
 
     val noteId: String = savedStateHandle.toRoute<EditorRoute>().noteId
 
-    private val _title = MutableStateFlow("")
-    val title: StateFlow<String> = _title.asStateFlow()
-
-    private val _body = MutableStateFlow("")
-    val body: StateFlow<String> = _body.asStateFlow()
+    private val mutableUiState = MutableStateFlow(NoteEditorUiState())
+    val uiState: StateFlow<NoteEditorUiState> = mutableUiState.asStateFlow()
 
     private val edits = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     private var hasUserEdited = false
     private var hasPersistedOnce = false
 
-    /** Drives the conflict banner (§10): `null` note (not yet created) never conflicts. */
-    val syncState: StateFlow<SyncState?> = repository.observeNote(noteId)
-        .map { it?.syncState }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-
     init {
         viewModelScope.launch {
             repository.observeNote(noteId).collect { note ->
-                if (note != null) {
-                    hasPersistedOnce = true
-                    if (!hasUserEdited) {
-                        _title.value = note.title
-                        _body.value = note.body
+                if (note == null) return@collect
+                hasPersistedOnce = true
+                mutableUiState.update { current ->
+                    // Once the user has typed, a remote update must not overwrite what's on screen.
+                    if (hasUserEdited) {
+                        current.copy(syncState = note.syncState)
+                    } else {
+                        current.copy(title = note.title, body = note.body, syncState = note.syncState)
                     }
                 }
             }
         }
         viewModelScope.launch {
-            edits.debounce(AUTOSAVE_DEBOUNCE_MS).collect { if (hasUserEdited) persistNow() }
+            edits.debounce(AUTOSAVE_DEBOUNCE_MS).collect { if (hasUserEdited) persist() }
         }
     }
 
     fun onTitleChange(value: String) {
         hasUserEdited = true
-        _title.value = value
+        mutableUiState.update { it.copy(title = value) }
         edits.tryEmit(Unit)
     }
 
     fun onBodyChange(value: String) {
         hasUserEdited = true
-        _body.value = value
+        mutableUiState.update { it.copy(body = value) }
         edits.tryEmit(Unit)
     }
 
     /**
-     * Wired to both the ON_STOP lifecycle event and onDispose (see [com.savvasg.offlinenotes.presentation.editor.NoteEditorScreen]),
-     * which can both fire for the same navigation-away — so this must be idempotent per edit
-     * session. Without resetting [hasUserEdited], a second immediate call re-runs writeTxn on
-     * unchanged content, which unconditionally sets syncState back to PENDING — clobbering a
-     * CONFLICT that the first call's sync may have already staged in the meantime. Caught live:
-     * the debug panel's "force conflict" correctly parked the op and staged note_conflicts, but
-     * the note's syncState read back PENDING because a redundant second flush() had just re-run
-     * writeTxn on top of it.
+     * Idempotent per edit session, deliberately: NoteEditorScreen wires this to both ON_STOP and
+     * onDispose, which can both fire for one navigation-away. Without clearing [hasUserEdited] the
+     * second call re-runs writeTxn on unchanged content, resetting syncState to PENDING and
+     * clobbering a CONFLICT the first call's sync had already staged. Caught live; guarded by
+     * NoteEditorViewModelTest.
      */
     fun flush() {
         if (!hasUserEdited) return
-        val title = _title.value
-        val body = _body.value
-        if (!hasPersistedOnce && title.isBlank() && body.isBlank()) return
+        persist(alsoSync = true)
+    }
+
+    private fun persist(alsoSync: Boolean = false) {
+        val state = mutableUiState.value
+        // Don't create a ghost note when the user opened the editor and typed nothing. Once the
+        // note exists, always persist — including edits back down to blank.
+        if (!hasPersistedOnce && state.title.isBlank() && state.body.isBlank()) return
         hasPersistedOnce = true
         hasUserEdited = false
         viewModelScope.launch(NonCancellable) {
-            repository.saveNote(noteId, title, body)
-            syncScheduler.expediteSync()
+            repository.saveNote(noteId, state.title, state.body)
+            if (alsoSync) syncScheduler.expediteSync()
         }
-    }
-
-    private fun persistNow() {
-        val title = _title.value
-        val body = _body.value
-        // Don't create a ghost note for a tap into the editor with nothing ever typed. Once a
-        // note has content on disk, always persist, including edits back down to blank.
-        if (!hasPersistedOnce && title.isBlank() && body.isBlank()) return
-        hasPersistedOnce = true
-        hasUserEdited = false // symmetric with flush() — see its kdoc for why this matters
-        viewModelScope.launch(NonCancellable) { repository.saveNote(noteId, title, body) }
     }
 
     private companion object {

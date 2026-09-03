@@ -3,22 +3,28 @@ package com.savvasg.offlinenotes.presentation.conflict
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.navigation.toRoute
 import com.savvasg.offlinenotes.domain.model.NoteConflict
 import com.savvasg.offlinenotes.domain.repository.NoteRepository
-import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+data class ConflictResolutionUiState(
+    val conflict: NoteConflict? = null,
+    /** What the resolution fields show. Falls back to the local side until the user edits. */
+    val draftTitle: String = "",
+    val draftBody: String = "",
+)
+
 /**
- * "keep mine" / "keep theirs" / manual edit (§10) all funnel through one editable draft: the
- * quick actions just overwrite it, so [resolve] always does the same thing regardless of how the
- * user got there.
+ * "Keep mine", "keep theirs" and manual editing all funnel through one draft — the quick actions
+ * just overwrite it — so [resolve] does the same thing regardless of how the user got there.
  */
 @HiltViewModel
 class ConflictResolutionViewModel @Inject constructor(
@@ -28,44 +34,40 @@ class ConflictResolutionViewModel @Inject constructor(
 
     val noteId: String = savedStateHandle.toRoute<ConflictRoute>().noteId
 
-    val conflict: StateFlow<NoteConflict?> = repository.observeConflict(noteId)
+    private val conflict: StateFlow<NoteConflict?> = repository.observeConflict(noteId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    private val _draftTitle = MutableStateFlow<String?>(null)
-    val draftTitle: StateFlow<String?> = _draftTitle.asStateFlow()
+    private val draft = MutableStateFlow<Pair<String, String>?>(null)
 
-    private val _draftBody = MutableStateFlow<String?>(null)
-    val draftBody: StateFlow<String?> = _draftBody.asStateFlow()
+    val uiState: StateFlow<ConflictResolutionUiState> = combine(conflict, draft) { conflict, draft ->
+        ConflictResolutionUiState(
+            conflict = conflict,
+            draftTitle = draft?.first ?: conflict?.localTitle.orEmpty(),
+            draftBody = draft?.second ?: conflict?.localBody.orEmpty(),
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ConflictResolutionUiState())
 
     fun useMine() {
-        conflict.value?.let {
-            _draftTitle.value = it.localTitle
-            _draftBody.value = it.localBody
-        }
+        conflict.value?.let { draft.value = it.localTitle to it.localBody }
     }
 
     fun useTheirs() {
-        conflict.value?.let {
-            _draftTitle.value = it.remoteTitle
-            _draftBody.value = it.remoteBody
-        }
+        conflict.value?.let { draft.value = it.remoteTitle to it.remoteBody }
     }
 
     fun onDraftTitleChange(value: String) {
-        _draftTitle.value = value
+        draft.value = value to uiState.value.draftBody
     }
 
     fun onDraftBodyChange(value: String) {
-        _draftBody.value = value
+        draft.value = uiState.value.draftTitle to value
     }
 
-    /** Resolves with the current draft, defaulting to "keep mine" if the user touched nothing. */
     fun resolve(onDone: () -> Unit) {
-        val current = conflict.value ?: return
-        val title = _draftTitle.value ?: current.localTitle
-        val body = _draftBody.value ?: current.localBody
+        val state = uiState.value
+        if (state.conflict == null) return
         viewModelScope.launch {
-            repository.resolveConflict(noteId, title, body)
+            repository.resolveConflict(noteId, state.draftTitle, state.draftBody)
             onDone()
         }
     }

@@ -11,11 +11,16 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+data class NotesListUiState(
+    val searchQuery: String = "",
+    val notes: List<NoteListItem> = emptyList(),
+)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -23,16 +28,20 @@ class NotesListViewModel @Inject constructor(
     private val repository: NoteRepository,
 ) : ViewModel() {
 
-    private val _searchQuery = MutableStateFlow("")
-    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+    private val searchQuery = MutableStateFlow("")
 
-    val notes: StateFlow<List<NoteListItem>> = _searchQuery
-        .debounce(SEARCH_DEBOUNCE_MS)
-        .flatMapLatest { query -> if (query.isBlank()) repository.observeNotes() else repository.searchNotes(query) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val uiState: StateFlow<NotesListUiState> = combine(
+        searchQuery,
+        searchQuery
+            .debounce(SEARCH_DEBOUNCE_MS)
+            .flatMapLatest { query ->
+                if (query.isBlank()) repository.observeNotes() else repository.searchNotes(query)
+            },
+    ) { query, notes -> NotesListUiState(query, notes) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NotesListUiState())
 
     fun onSearchQueryChange(query: String) {
-        _searchQuery.value = query
+        searchQuery.value = query
     }
 
     fun onDeleteNote(id: String) {

@@ -14,6 +14,7 @@ import com.savvasg.offlinenotes.sync.SyncScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 
@@ -26,6 +27,14 @@ import kotlinx.coroutines.flow.stateIn
  * transport" toggle is on — that path is real HTTP against whatever Mockoon/real server is
  * configured, which has its own way of scripting responses.)
  */
+data class DebugPanelUiState(
+    val outboxOps: List<OutboxEntity> = emptyList(),
+    val syncToken: String? = null,
+    val activeNotes: List<NoteEntity> = emptyList(),
+    val useHttpTransport: Boolean = false,
+    val baseUrl: String = "",
+)
+
 @HiltViewModel
 class DebugPanelViewModel @Inject constructor(
     private val fakeTransport: FakeTransport,
@@ -33,17 +42,18 @@ class DebugPanelViewModel @Inject constructor(
     syncMetaDao: SyncMetaDao,
     noteDao: NoteDao,
     private val syncScheduler: SyncScheduler,
-    val transportSettings: TransportSettings,
+    private val transportSettings: TransportSettings,
 ) : ViewModel() {
 
-    val outboxOps: StateFlow<List<OutboxEntity>> =
-        outboxDao.observeAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    val syncToken: StateFlow<String?> =
-        syncMetaDao.observeSyncToken().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-
-    val activeNotes: StateFlow<List<NoteEntity>> =
-        noteDao.observeActiveNotes().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val uiState: StateFlow<DebugPanelUiState> = combine(
+        outboxDao.observeAll(),
+        syncMetaDao.observeSyncToken(),
+        noteDao.observeActiveNotes(),
+        transportSettings.useHttpTransport,
+        transportSettings.baseUrl,
+    ) { outboxOps, syncToken, activeNotes, useHttp, baseUrl ->
+        DebugPanelUiState(outboxOps, syncToken, activeNotes, useHttp, baseUrl)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DebugPanelUiState())
 
     fun forceSyncNow() = syncScheduler.expediteSync()
 
@@ -61,4 +71,8 @@ class DebugPanelViewModel @Inject constructor(
     fun expireTokenOnNextPull() = fakeTransport.expireTokenOnNextPull()
     fun forceRateLimitOnNextCall() = fakeTransport.forceRateLimitOnNextCall()
     fun forceAuthFailureOnNextCall() = fakeTransport.forceAuthFailureOnNextCall()
+
+    fun setUseHttpTransport(value: Boolean) = transportSettings.setUseHttpTransport(value)
+
+    fun setBaseUrl(value: String) = transportSettings.setBaseUrl(value)
 }

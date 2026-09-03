@@ -15,18 +15,18 @@ import kotlinx.coroutines.flow.asStateFlow
  */
 @Singleton
 class TransportSettings @Inject constructor() {
-    private val _useHttpTransport = MutableStateFlow(false)
-    val useHttpTransport: StateFlow<Boolean> = _useHttpTransport.asStateFlow()
+    private val mutableUseHttpTransport = MutableStateFlow(false)
+    val useHttpTransport: StateFlow<Boolean> = mutableUseHttpTransport.asStateFlow()
 
-    private val _baseUrl = MutableStateFlow(DEFAULT_EMULATOR_BASE_URL)
-    val baseUrl: StateFlow<String> = _baseUrl.asStateFlow()
+    private val mutableBaseUrl = MutableStateFlow(DEFAULT_EMULATOR_BASE_URL)
+    val baseUrl: StateFlow<String> = mutableBaseUrl.asStateFlow()
 
     fun setUseHttpTransport(value: Boolean) {
-        _useHttpTransport.value = value
+        mutableUseHttpTransport.value = value
     }
 
     fun setBaseUrl(value: String) {
-        _baseUrl.value = value
+        mutableBaseUrl.value = value
     }
 
     companion object {

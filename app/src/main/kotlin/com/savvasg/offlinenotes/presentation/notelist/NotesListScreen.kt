@@ -49,8 +49,7 @@ fun NotesListScreen(
     onOpenDebugPanel: (() -> Unit)?,
     viewModel: NotesListViewModel = hiltViewModel(),
 ) {
-    val notes by viewModel.notes.collectAsStateWithLifecycle()
-    val query by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -74,7 +73,7 @@ fun NotesListScreen(
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             TextField(
-                value = query,
+                value = uiState.searchQuery,
                 onValueChange = viewModel::onSearchQueryChange,
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 placeholder = { Text("Search notes") },
@@ -82,16 +81,16 @@ fun NotesListScreen(
                 singleLine = true,
             )
 
-            if (notes.isEmpty()) {
+            if (uiState.notes.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
-                        if (query.isBlank()) "No notes yet — tap + to create one" else "No matches",
+                        if (uiState.searchQuery.isBlank()) "No notes yet — tap + to create one" else "No matches",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             } else {
                 LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
-                    items(notes, key = { it.id }) { note ->
+                    items(uiState.notes, key = { it.id }) { note ->
                         NoteRow(
                             note = note,
                             onClick = { onNoteClick(note.id) },
