@@ -20,10 +20,8 @@ import java.util.UUID
 import javax.inject.Inject
 
 /**
- * The three transaction types from §5 — the ground every sync correctness claim in this app
- * reduces to. Each is exactly one `BEGIN…COMMIT`, spanning `notes` + `outbox` (+ `note_conflicts`
- * for the conflict apply result), so atomicity (invariant 4) comes free with the transaction
- * rather than being something callers have to get right.
+ * Each function here is exactly one BEGIN...COMMIT spanning notes + outbox (+ note_conflicts), so
+ * callers get atomicity by calling one of them rather than by sequencing writes correctly.
  */
 class NoteTransactions @Inject constructor(
     private val db: OfflineNotesDatabase,
@@ -35,21 +33,13 @@ class NoteTransactions @Inject constructor(
     private fun newOpId(): String = UUID.randomUUID().toString()
 
     /**
-     * `androidx.room.withTransaction` assumes a `SupportSQLiteOpenHelper`, which doesn't exist
-     * once the database is built with `setDriver(BundledSQLiteDriver())` (see
-     * [OfflineNotesDatabase.CALLBACK]'s kdoc for why bundled SQLite is required at all) — it
-     * throws "Cannot return a SupportSQLiteOpenHelper" at runtime. This is the driver-based
-     * replacement: acquire the writer connection and start a transaction on it directly.
+     * `androidx.room.withTransaction` assumes a `SupportSQLiteOpenHelper`, which does not exist once
+     * the database is built with `setDriver(BundledSQLiteDriver())` (see [OfflineNotesDatabase]) — it
+     * throws "Cannot return a SupportSQLiteOpenHelper" at runtime. This is the driver-based form.
      */
     private suspend fun <R> transaction(block: suspend () -> R): R =
         db.useWriterConnection { connection -> connection.immediateTransaction { block() } }
 
-    /**
-     * Write txn (§5): a user edit. Upserts the note and coalesces into the note's existing
-     * PENDING op if one exists (same opId, opType unchanged — a CREATE stays a CREATE), or
-     * creates a new op otherwise. opType is decided from `serverVersion IS NULL` at that moment,
-     * never from edit count.
-     */
     suspend fun writeTxn(noteId: String, title: String, body: String, now: Long) {
         transaction {
             val existing = noteDao.getNote(noteId)
@@ -86,11 +76,7 @@ class NoteTransactions @Inject constructor(
         }
     }
 
-    /**
-     * Delete txn (§5 family, §8 delete/edit race): tombstones the note locally and coalesces into
-     * the note's PENDING op the same way [writeTxn] does, but as opType DELETE with no payload.
-     * The row is purged only after the server acks the delete (§4) — never here.
-     */
+    /** Tombstones locally; the row is purged only once the server acks the delete, never here. */
     suspend fun deleteTxn(noteId: String, now: Long) {
         transaction {
             val existing = noteDao.getNote(noteId) ?: return@transaction
@@ -117,10 +103,8 @@ class NoteTransactions @Inject constructor(
     }
 
     /**
-     * Freeze txn (§5): drain start, the linearization point. PENDING → IN_FLIGHT for every
-     * drainable op, resolving each one's baseVersion from `notes.serverVersion` right here so a
-     * concurrently-created op can never ship a stale base. The returned payloads are immutable
-     * from this point on.
+     * Drain start, and the linearization point. baseVersion is resolved here rather than at enqueue,
+     * so an op created concurrently with a drain cannot ship a stale base.
      */
     suspend fun freezeTxn(): List<FrozenOutboxOp> = transaction {
         outboxDao.getPendingOpsOrderedByCreatedAt().map { op ->
@@ -139,11 +123,7 @@ class NoteTransactions @Inject constructor(
         }
     }
 
-    /**
-     * Apply txn (§5): APPLIED result. Only the sync watermark moves — content is never touched,
-     * so edits made after the freeze (already sitting in a fresh PENDING op) are preserved
-     * untouched. syncState only returns to SYNCED once no outbox rows remain for the note.
-     */
+    /** Moves only the sync watermark, so edits made after the freeze (now in a fresh op) survive. */
     suspend fun applyAppliedTxn(opId: String, newVersion: String) {
         transaction {
             val op = outboxDao.getById(opId) ?: return@transaction
@@ -154,11 +134,7 @@ class NoteTransactions @Inject constructor(
         }
     }
 
-    /**
-     * Apply txn (§5): CONFLICT result. Parks the op and stages all three merge inputs — local
-     * stays in `notes`, base+remote land in `note_conflicts` — never auto-applying remote content
-     * (invariant 2; see §7's "no MERGED result").
-     */
+    /** Stages base+remote alongside the untouched local content; remote is never auto-applied. */
     suspend fun applyConflictTxn(opId: String, conflict: ConflictPayload, detectedAt: Long) {
         transaction {
             val op = outboxDao.getById(opId) ?: return@transaction
@@ -180,11 +156,7 @@ class NoteTransactions @Inject constructor(
         }
     }
 
-    /**
-     * Apply txn (§5): REJECTED result. The op is a poison pill — deleted, never retried. Returns
-     * the deleted row so the caller can surface the error; the transaction itself is bookkeeping
-     * only.
-     */
+    /** A rejected op is a poison pill: deleted rather than retried, and returned so the caller can surface it. */
     suspend fun applyRejectedTxn(opId: String): OutboxEntity? = transaction {
         val op = outboxDao.getById(opId) ?: return@transaction null
         outboxDao.delete(opId)
@@ -192,11 +164,9 @@ class NoteTransactions @Inject constructor(
     }
 
     /**
-     * Delta-pull page apply (§6): the skip rule read-path half of invariant 2. Safe to overwrite
-     * blindly when no op exists *because* the write txn guarantees any user edit has a
-     * corresponding op — the outbox isn't just a queue, it's what makes blind overwrite correct.
-     * The whole page and the advanced [newSyncToken] land in one transaction: advancing the
-     * cursor outside of it would leave a silent permanent gap on crash.
+     * Overwriting blindly when no op exists is only correct because the write txn guarantees every
+     * user edit has one. The page and the advanced token share a transaction — advancing the cursor
+     * separately would leave a permanent silent gap on crash.
      */
     suspend fun applyDeltaTxn(remoteNotes: List<RemoteNoteChange>, newSyncToken: String, now: Long) {
         transaction {
@@ -206,13 +176,10 @@ class NoteTransactions @Inject constructor(
     }
 
     /**
-     * Bootstrap / re-bootstrap after token expiry (§7): applies the full current-state snapshot
-     * the same way [applyDeltaTxn] applies a page, *plus* one extra pass a plain delta page
-     * doesn't need — a bootstrap snapshot is exhaustive, so a previously-synced local note
-     * (`serverVersion != null`) that's simply absent from it, with no live op protecting it, was
-     * deleted server-side and must be purged locally. A local note with `serverVersion == null`
-     * needs no such handling: by invariant it always has a live (PENDING/IN_FLIGHT) op, which
-     * already exempts it via the ordinary skip rule.
+     * A bootstrap snapshot is exhaustive, so unlike a delta page it also has to purge: a
+     * previously-synced local note absent from the snapshot, with no live op protecting it, was
+     * deleted server-side. Notes with no serverVersion always have a live op, so the ordinary
+     * skip rule already exempts them.
      */
     suspend fun applyBootstrapTxn(remoteNotes: List<RemoteNoteChange>, newSyncToken: String, now: Long) {
         transaction {
@@ -232,7 +199,7 @@ class NoteTransactions @Inject constructor(
     private suspend fun applyRemoteNotesLocked(remoteNotes: List<RemoteNoteChange>, now: Long) {
         for (remote in remoteNotes) {
             when {
-                outboxDao.hasPendingOrInFlight(remote.noteId) -> Unit // SKIP entirely
+                outboxDao.hasPendingOrInFlight(remote.noteId) -> Unit
                 outboxDao.hasParked(remote.noteId) -> conflictDao.refreshRemote(
                     remote.noteId,
                     remote.version,
@@ -263,11 +230,9 @@ class NoteTransactions @Inject constructor(
     }
 
     /**
-     * Conflict resolution (§8): one transaction — delete the parked op, delete the conflict row,
-     * write the resolved content, and enqueue a fresh op (new opId, baseVersion = remoteVersion)
-     * so the next drain ships it cleanly. There is no special "resolve" wire call (§8) — this is
-     * an ordinary write, just seeded from the conflict's remote version instead of the note's own
-     * (possibly stale) `serverVersion`.
+     * Seeds the fresh op's base from the conflict's remoteVersion rather than the note's own
+     * (stale) serverVersion, which is what lets an ordinary write settle a conflict — there is no
+     * separate resolve call in the wire contract.
      */
     suspend fun resolveConflictTxn(noteId: String, title: String, body: String, now: Long) {
         transaction {

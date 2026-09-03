@@ -5,10 +5,7 @@ import com.savvasg.offlinenotes.data.remote.dto.OpResult
 import com.savvasg.offlinenotes.data.remote.dto.DeltaPage
 
 /**
- * The transport contract. Both [FakeTransport][com.savvasg.offlinenotes.data.remote.fake.FakeTransport]
- * and `HttpTransport` implement this — one contract, two ways to reach it: a scriptable local
- * stub for zero-setup dev/tests, and a real HTTP client for whatever server (or Mockoon mock)
- * actually implements the semantics on the other end.
+ * The transport contract, implemented both by a scriptable local stub and by a real HTTP client.
  *
  * Contract rules an implementation must honour:
  * - Per-op independence: one conflict never fails the batch; results come back in request order.

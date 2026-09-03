@@ -10,14 +10,14 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface OutboxDao {
-    // Room's generated @Upsert resolves conflicts via INSERT OR IGNORE, so a would-be violation
-    // of idx_outbox_one_pending here no-ops silently rather than throwing. That's fine only
-    // because callers (NoteTransactions) always check-then-act inside the same db.withTransaction,
-    // so the invariant is never actually attempted to be violated through this method.
+    // Room's generated @Upsert resolves conflicts with INSERT OR IGNORE, so a would-be violation of
+    // idx_outbox_one_pending no-ops silently here rather than throwing. That is only acceptable
+    // because NoteTransactions always check-then-acts within one transaction, so the invariant is
+    // never actually attempted through this method.
     @Upsert
     suspend fun upsert(op: OutboxEntity)
 
-    /** At most one row per note by construction (idx_outbox_one_pending). */
+    /** At most one row per note by construction. */
     @Query("SELECT * FROM outbox WHERE noteId = :noteId AND status = 'PENDING' LIMIT 1")
     suspend fun getPendingForNote(noteId: String): OutboxEntity?
 
@@ -27,33 +27,30 @@ interface OutboxDao {
     @Query("SELECT * FROM outbox WHERE status = 'PENDING' ORDER BY createdAt ASC")
     suspend fun getPendingOpsOrderedByCreatedAt(): List<OutboxEntity>
 
-    /** Sync engine loop check (§6 step 5): any PENDING op left is live-editing residue. */
     @Query("SELECT EXISTS(SELECT 1 FROM outbox WHERE status = 'PENDING')")
     suspend fun hasAnyPending(): Boolean
 
     @Query("UPDATE outbox SET status = :status WHERE opId = :opId")
     suspend fun updateStatus(opId: String, status: OutboxStatus)
 
-    /** An op row is deleted only when its data is on the server, or the user superseded it. */
     @Query("DELETE FROM outbox WHERE opId = :opId")
     suspend fun delete(opId: String)
 
     @Query("SELECT COUNT(*) FROM outbox WHERE noteId = :noteId")
     suspend fun countForNote(noteId: String): Int
 
-    /** Delta-pull skip rule, first half (§6): a note with a live op is never overwritten by a pull. */
+    /** Skip rule, first half: a note with a live op is never overwritten by a pull. */
     @Query("SELECT EXISTS(SELECT 1 FROM outbox WHERE noteId = :noteId AND status IN ('PENDING', 'IN_FLIGHT'))")
     suspend fun hasPendingOrInFlight(noteId: String): Boolean
 
-    /** Delta-pull skip rule, second half (§6): a parked conflict only gets its remote side refreshed. */
+    /** Skip rule, second half: a parked conflict only gets its remote side refreshed. */
     @Query("SELECT EXISTS(SELECT 1 FROM outbox WHERE noteId = :noteId AND status = 'PARKED')")
     suspend fun hasParked(noteId: String): Boolean
 
-    /** Crash recovery (§6 pipeline step 0). Safe because opIds are stable and replay dedupes. */
+    /** Safe because opIds are stable and a replayed op is deduped by the server. */
     @Query("UPDATE outbox SET status = 'PENDING' WHERE status = 'IN_FLIGHT'")
     suspend fun resetInFlightToPending()
 
-    /** Backs the debug-panel outbox inspector (§10). */
     @Query("SELECT * FROM outbox ORDER BY createdAt ASC")
     fun observeAll(): Flow<List<OutboxEntity>>
 }

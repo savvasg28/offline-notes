@@ -24,10 +24,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 
 /**
- * The one implementation behind both repository interfaces (§3). Splitting the interfaces, not
- * the implementation, is what lets [freezeAndDrain]/[applyResult]/[stageConflict]/[applyDelta]/
- * [resetStaleInFlight] share the exact same DAOs and [NoteTransactions] as the UI-facing side
- * without either side being able to accidentally call into the other's intent.
+ * One implementation behind both repository interfaces: splitting the interfaces rather than the
+ * implementation lets both sides share the same DAOs and [NoteTransactions] while neither can
+ * accidentally call into the other's intent.
  */
 @Singleton
 class NoteRepositoryImpl @Inject constructor(
@@ -39,8 +38,6 @@ class NoteRepositoryImpl @Inject constructor(
     private val syncScheduler: SyncScheduler,
 ) : NoteRepository, NoteSyncOperations {
 
-    // ---- NoteRepository (UI-facing) ----
-
     override fun observeNotes(): Flow<List<NoteListItem>> =
         noteDao.observeActiveNotes().map { notes -> notes.map { it.toListItem() } }
 
@@ -49,7 +46,7 @@ class NoteRepositoryImpl @Inject constructor(
 
     override suspend fun saveNote(id: String, title: String, body: String) {
         transactions.writeTxn(id, title, body, now = System.currentTimeMillis())
-        syncScheduler.scheduleDebouncedSync() // first edit since idle (§6); KEEP makes the rest no-ops
+        syncScheduler.scheduleDebouncedSync()
     }
 
     override suspend fun deleteNote(id: String) {
@@ -83,7 +80,6 @@ class NoteRepositoryImpl @Inject constructor(
             )
         }
 
-    // ---- NoteSyncOperations (sync-facing) ----
 
     override suspend fun freezeAndDrain(): List<FrozenOutboxOp> = transactions.freezeTxn()
 
@@ -134,10 +130,9 @@ private fun NoteEntity.toListItem() = NoteListItem(
 )
 
 /**
- * Builds a safe, prefix-matching FTS5 MATCH expression from raw search-box input: each token is
- * quoted (escaping embedded quotes) so FTS5 query-syntax operators typed by the user can't leak
- * through, then suffixed with `*` for prefix matching. Null for blank input — "no filter" rather
- * than an invalid empty MATCH.
+ * Quotes each token (escaping embedded quotes) so FTS5 operators typed into the search box cannot
+ * leak through as query syntax, then suffixes `*` for prefix matching. Null for blank input, which
+ * means "no filter" rather than an invalid empty MATCH.
  */
 internal fun buildFtsMatchQuery(raw: String): String? {
     val tokens = raw.trim().split(Regex("\\s+")).filter { it.isNotBlank() }

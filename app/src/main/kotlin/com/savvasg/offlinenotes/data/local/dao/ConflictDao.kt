@@ -20,7 +20,7 @@ interface ConflictDao {
     @Query("DELETE FROM note_conflicts WHERE noteId = :noteId")
     suspend fun delete(noteId: String)
 
-    /** Later delta pulls refresh the remote side of an unresolved conflict in place (§4). */
+    /** Later delta pulls refresh the remote side of an unresolved conflict in place. */
     @Query(
         "UPDATE note_conflicts SET remoteVersion = :remoteVersion, remoteTitle = :remoteTitle, remoteBody = :remoteBody WHERE noteId = :noteId",
     )

@@ -43,8 +43,8 @@ fun NoteEditorScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // Editor close / app background (§6): flush immediately rather than waiting out the
-    // autosave debounce, so nothing typed in the last ~800ms is left un-persisted.
+    // Flush immediately on editor close or app background rather than waiting out the autosave
+    // debounce, so nothing typed in the last moments is left un-persisted.
     val currentViewModel by rememberUpdatedState(viewModel)
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {

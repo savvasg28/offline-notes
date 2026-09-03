@@ -6,11 +6,8 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * The wire contract [SyncTransport] implementations speak. This repo doesn't own backend
- * semantics — the app is a client against a contract, full stop. These types describe that
- * contract; nothing in this module implements it. [FakeTransport][com.savvasg.offlinenotes.data.remote.fake.FakeTransport]
- * is a scriptable stub for local dev/tests, and `HttpTransport` talks to whatever real (or
- * Mockoon-mocked) server honours this shape.
+ * The wire contract [SyncTransport] implementations speak. This repo is a client against that
+ * contract; nothing here implements the server side of it.
  */
 @Serializable
 data class OutgoingOp(
@@ -23,12 +20,9 @@ data class OutgoingOp(
 )
 
 /**
- * Per-op push result. Conflict and Rejected are results, not transport errors.
- *
- * `@SerialName` on each variant pins the wire discriminator to a short, stable string —
- * without it, kotlinx.serialization defaults to the fully-qualified Kotlin class name, which
- * would leak internal package structure into the HTTP wire format and break the moment a class
- * gets renamed or moved.
+ * `@SerialName` pins each variant's wire discriminator to a short, stable string. Without it
+ * kotlinx.serialization defaults to the fully-qualified Kotlin class name, which would leak package
+ * structure into the wire format and break the moment a class is renamed or moved.
  */
 @Serializable
 sealed interface OpResult {
@@ -55,7 +49,6 @@ sealed interface OpResult {
     data class Rejected(override val opId: String, val code: String, val message: String) : OpResult
 }
 
-/** One note's entry in a delta page — a tombstone when [deleted] is true. */
 @Serializable
 data class RemoteNote(
     val noteId: String,
@@ -72,7 +65,7 @@ data class DeltaPage(
     val hasMore: Boolean,
 )
 
-/** syncToken no longer reaches far enough back into history — client clears it and re-bootstraps. */
+/** The cursor no longer reaches far enough back into history; the client re-bootstraps. */
 class SyncTokenExpiredException : Exception("sync token expired; client must clear it and re-bootstrap")
 
 /** Transport-level failures: retry the whole batch with the same opIds. */

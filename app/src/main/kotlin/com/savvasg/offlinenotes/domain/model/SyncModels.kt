@@ -2,21 +2,13 @@ package com.savvasg.offlinenotes.domain.model
 
 import kotlinx.serialization.Serializable
 
-/** Whether a note's content currently matches the server. Derived from the outbox, not stored independently. */
 enum class SyncState { SYNCED, PENDING, CONFLICT }
 
-/**
- * Decided by whether the note has a `serverVersion` yet, never by edit count — a note edited
- * many times before its first successful push is still a CREATE.
- */
+/** Decided by whether the note has a `serverVersion` yet, never by edit count. */
 @Serializable
 enum class OpType { CREATE, UPDATE, DELETE }
 
-/**
- * An outbox op snapshotted at the freeze point, with `baseVersion` resolved from the note's
- * current `serverVersion` at that instant rather than when the op was created — an op created
- * before a prior ack would otherwise ship a stale base and self-conflict.
- */
+/** `baseVersion` is resolved at the freeze point, not when the op was created. */
 data class FrozenOutboxOp(
     val opId: String,
     val noteId: String,
@@ -26,7 +18,7 @@ data class FrozenOutboxOp(
     val body: String?,
 )
 
-/** The base and remote sides of a conflict. Local is the `notes` row itself, so it isn't copied here. */
+/** Base and remote sides of a conflict; local is the `notes` row itself, so it is not copied here. */
 data class ConflictPayload(
     val baseVersion: String?,
     val baseTitle: String?,
@@ -36,7 +28,6 @@ data class ConflictPayload(
     val remoteBody: String,
 )
 
-/** One note's entry in a delta pull page — a tombstone when [isDeleted] is true. */
 data class RemoteNoteChange(
     val noteId: String,
     val version: String,

@@ -14,12 +14,9 @@ import javax.inject.Singleton
 import retrofit2.Response
 
 /**
- * Retrofit implementation of the wire contract against a real HTTP server — a Mockoon-mocked
- * environment for local dev/demo, or a genuine backend. This repo doesn't implement that server;
- * it only needs to be a correct client of it. Maps HTTP status codes to the same exception types
- * [com.savvasg.offlinenotes.data.remote.fake.FakeTransport] throws for its own forced
- * failures, so [com.savvasg.offlinenotes.sync.SyncEngine] handles a transport failure identically
- * regardless of which [SyncTransport] backs it.
+ * Maps HTTP status codes onto the same exception types the local stub throws, so
+ * [com.savvasg.offlinenotes.sync.SyncEngine] handles a transport failure identically whichever
+ * [SyncTransport] backs it.
  */
 @Singleton
 class HttpTransport @Inject constructor(private val api: OfflineNotesApi) : SyncTransport {

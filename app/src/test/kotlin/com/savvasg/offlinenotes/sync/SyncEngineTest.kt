@@ -23,15 +23,12 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * Integration tests wiring the real [NoteRepositoryImpl] + Room (schema only — see
- * NoteTransactionsTest for why FTS5 is excluded here) to a scripted [FakeTransport], driven
- * through [SyncEngine]. No Hilt: everything is small enough to construct directly, which keeps
- * these tests fast and free of any framework magic to reason around.
+ * Wires the real [NoteRepositoryImpl] + Room (schema only — see NoteTransactionsTest for why FTS5
+ * is excluded) to a scripted [FakeTransport], driven through [SyncEngine]. No Hilt: everything is
+ * small enough to construct directly.
  *
- * This repo doesn't own backend semantics (§ Rejected alternatives) — [FakeTransport] is a
- * stateless stub, not a simulated server — so these tests script exactly the responses each
- * scenario needs (`forceConflictOnNextPush`, `queueNextPullPage`, ...) rather than driving real
- * server-side CAS/version state.
+ * [FakeTransport] is a stateless stub rather than a simulated server, so each test scripts exactly
+ * the responses its scenario needs instead of driving real server-side version state.
  */
 @RunWith(RobolectricTestRunner::class)
 class SyncEngineTest {
@@ -93,11 +90,9 @@ class SyncEngineTest {
 
         assertThat(db.outboxDao().getById(opId)!!.status).isEqualTo(OutboxStatus.IN_FLIGHT)
 
-        // App restarts; engine.sync() resets the stale IN_FLIGHT op and re-freezes it — same
-        // opId (proven at the transaction layer by NoteTransactionsTest's crash-recovery test;
-        // this repo doesn't own backend semantics, so there's no server-side dedupe to assert
-        // "same version" against — what's the client's to guarantee is that it replays the
-        // identical op rather than fabricating a new one).
+        // App restarts; the engine resets the stale IN_FLIGHT op and re-freezes it under the same
+        // opId. There is no server-side dedupe to assert against here — what the client must
+        // guarantee is that it replays the identical op rather than fabricating a new one.
         val outcome = engine.sync()
 
         assertThat(outcome).isEqualTo(SyncOutcome.Done)

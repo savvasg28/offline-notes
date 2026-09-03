@@ -21,10 +21,9 @@ import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 
 /**
- * §11: "HttpTransport gets its own unit tests against MockWebServer (serialization, error
- * mapping, retry, backoff)." Retry/backoff themselves aren't HttpTransport's job — a transport
- * failure just throws, and WorkManager's own Result.retry()/backoff policy (wired in SyncWorker)
- * handles the rest — so this covers serialization and error mapping specifically.
+ * Covers serialization and status-code mapping. Retry and backoff are not HttpTransport's job — a
+ * transport failure just throws, and WorkManager's own retry policy (wired in SyncWorker) does the
+ * rest.
  */
 class HttpTransportTest {
 

@@ -6,10 +6,9 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * PK = one live conflict per note. No localTitle/localBody columns: local *is* the current
- * [NoteEntity] row. The three merge inputs live in three places by design — local in `notes`,
- * base+remote here — one source of truth each. [remoteTitle]/[remoteBody]/[remoteVersion] are
- * refreshed in place by later delta pulls while the conflict is unresolved.
+ * No local columns: local *is* the current [NoteEntity] row. The three merge inputs live in three
+ * places by design, one source of truth each. The remote side is refreshed in place by later delta
+ * pulls while the conflict is unresolved.
  */
 @Entity(
     tableName = "note_conflicts",

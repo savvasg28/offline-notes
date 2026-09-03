@@ -28,10 +28,8 @@ abstract class OfflineNotesDatabase : RoomDatabase() {
         const val DB_NAME = "offline_notes.db"
 
         /**
-         * The partial unique index that is the coalescing invariant (§4) — @Index can't express
-         * a WHERE clause, so it's raw SQL, applied once when the database file is created.
-         * Split out from [FTS_CALLBACK] because it's plain SQLite and safe under Robolectric,
-         * unlike FTS5 (see below).
+         * At most one PENDING op per note, enforced in the schema. Raw SQL because @Index cannot
+         * express a WHERE clause, and split from [FTS_CALLBACK] because plain SQLite runs anywhere.
          */
         val SCHEMA_CALLBACK = object : RoomDatabase.Callback() {
             override fun onCreate(connection: SQLiteConnection) {
@@ -43,20 +41,15 @@ abstract class OfflineNotesDatabase : RoomDatabase() {
         }
 
         /**
-         * FTS5 external-content table + sync triggers for offline search (§4, §10). FTS5 has no
-         * Room annotation, so it's raw SQL; `content_rowid='rowid'` piggybacks on SQLite's
-         * implicit integer rowid since `notes.id` (the declared PK) is TEXT.
+         * FTS5 has no Room annotation, so the virtual table and its sync triggers are raw SQL;
+         * `content_rowid='rowid'` piggybacks on SQLite's implicit rowid because `notes.id` is TEXT.
          *
-         * Production builds the database against
-         * [androidx.sqlite.driver.bundled.BundledSQLiteDriver] rather than the platform's own
-         * SQLite, specifically because FTS5 isn't guaranteed on the OS-provided one (confirmed
-         * absent on the API 36 emulator image used during development). That bundled driver
-         * ships an Android-native binary only, so it can't load under Robolectric's host-JVM
-         * unit tests — those build the database without a driver at all (Robolectric's own
-         * shadowed SQLite), which also lacks FTS5. So this callback stays split from
-         * [SCHEMA_CALLBACK]: unit tests apply schema-only and verify FTS5 with an instrumented
-         * test instead (§11: DAO tests for the FTS queries); production composes both via
-         * `Room.databaseBuilder(...).addCallback` called twice.
+         * Production builds against [androidx.sqlite.driver.bundled.BundledSQLiteDriver] rather than
+         * the platform's SQLite precisely because FTS5 is not guaranteed there — it is absent from the
+         * API 36 emulator image. That driver ships an Android-native binary, so it cannot load under
+         * Robolectric, whose own SQLite also lacks FTS5. Hence the split: host tests apply
+         * [SCHEMA_CALLBACK] alone and cover FTS through an instrumented test, while production adds
+         * both callbacks.
          */
         val FTS_CALLBACK = object : RoomDatabase.Callback() {
             override fun onCreate(connection: SQLiteConnection) {

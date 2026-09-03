@@ -19,11 +19,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/**
- * Unit tests for the three transaction types (§5). Several of these are the named scenario
- * tests from §11, exercised directly against the transaction layer rather than the full sync
- * engine, since the engine doesn't exist yet at this point in the build order (§14 step 1).
- */
 @RunWith(RobolectricTestRunner::class)
 class NoteTransactionsTest {
 

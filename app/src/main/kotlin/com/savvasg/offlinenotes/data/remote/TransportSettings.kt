@@ -7,11 +7,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * The debug-panel toggle between the default in-process fake and the demo HTTP path (§9), plus
- * the HTTP base URL — configurable at runtime since it differs by target: the emulator reaches
- * the host at `10.0.2.2`, a physical device needs the host's LAN IP (§9 "Practical notes").
- *
- * Deliberately in-memory only, not persisted: this is a reviewer/demo toggle, not a user setting.
+ * The base URL is runtime-configurable because it differs by target: the emulator reaches the host
+ * at `10.0.2.2`, a physical device needs the host's LAN IP. In memory only, deliberately — this is
+ * a demo toggle, not a user setting.
  */
 @Singleton
 class TransportSettings @Inject constructor() {
@@ -30,7 +28,7 @@ class TransportSettings @Inject constructor() {
     }
 
     companion object {
-        /** The AVD's alias for the host machine — see §9 "Emulator networking". */
+        /** The AVD's alias for the host machine. */
         const val DEFAULT_EMULATOR_BASE_URL = "http://10.0.2.2:8080/"
     }
 }

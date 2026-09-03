@@ -6,9 +6,8 @@ import com.savvasg.offlinenotes.domain.model.NoteListItem
 import kotlinx.coroutines.flow.Flow
 
 /**
- * UI-facing half of the repository (§3). Writes here are *intents*: [saveNote] always goes
- * through the outbox, never touches `serverVersion` directly. The sync engine never calls these
- * methods — see [NoteSyncOperations] for why.
+ * Writes here are intents: [saveNote] always goes through the outbox and never touches
+ * `serverVersion`. The sync engine must not call these — see [NoteSyncOperations].
  */
 interface NoteRepository {
     fun observeNotes(): Flow<List<NoteListItem>>
@@ -18,6 +17,5 @@ interface NoteRepository {
     suspend fun resolveConflict(noteId: String, title: String, body: String)
     fun searchNotes(query: String): Flow<List<NoteListItem>>
 
-    /** Backs the conflict resolution screen (§10): local + base + remote, one source each. */
     fun observeConflict(noteId: String): Flow<NoteConflict?>
 }

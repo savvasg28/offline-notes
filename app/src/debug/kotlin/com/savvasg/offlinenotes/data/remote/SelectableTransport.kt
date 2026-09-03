@@ -9,8 +9,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * The debug-panel toggle (§9) lives here: the sync engine only ever depends on [SyncTransport],
- * so swapping which real implementation backs it never touches [com.savvasg.offlinenotes.sync.SyncEngine].
+ * The sync engine only ever depends on [SyncTransport], so switching which implementation backs it
+ * never touches [com.savvasg.offlinenotes.sync.SyncEngine].
  */
 @Singleton
 class SelectableTransport @Inject constructor(

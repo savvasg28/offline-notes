@@ -14,11 +14,9 @@ import javax.inject.Singleton
 import kotlinx.coroutines.delay
 
 /**
- * The default transport: zero setup, no real backend behind it. This repo doesn't own backend
- * semantics — the app is a client against a contract — so this is a scriptable stub, not a
- * simulated server: no CAS, no persistence, no dedupe. Every push defaults to `Applied` with a
- * freshly-minted version; the debug panel's failure-injection controls queue one-shot overrides
- * on top of that default, which is exactly what a Mockoon rule set does over real HTTP.
+ * A scriptable stub, not a simulated server: no CAS, no persistence, no dedupe. Every push defaults
+ * to `Applied` with a freshly-minted version, and the debug panel's controls queue one-shot
+ * overrides on top of that — the same shape a Mockoon rule set has over real HTTP.
  */
 @Singleton
 class FakeTransport @Inject constructor() : SyncTransport {
@@ -71,13 +69,10 @@ class FakeTransport @Inject constructor() : SyncTransport {
         }
     }
 
-    // ---- debug panel controls ----
-
     fun setLatencyMillis(range: LongRange?) {
         latencyRangeMillis = range
     }
 
-    /** One-shot: the next push for [noteId] comes back Conflict instead of Applied. */
     fun forceConflictOnNextPush(
         noteId: String,
         remoteTitle: String = "Edited by Device B",
@@ -114,8 +109,7 @@ class FakeTransport @Inject constructor() : SyncTransport {
         forcedException = { throw AuthFailureException() }
     }
 
-    /** One-shot: the next pull returns exactly this page instead of the empty default. Mainly
-     * for tests exercising the pull path directly — not currently wired to the debug panel UI. */
+    /** Not wired to the debug panel UI; used by tests that exercise the pull path directly. */
     fun queueNextPullPage(page: DeltaPage) {
         nextPullPage = page
     }

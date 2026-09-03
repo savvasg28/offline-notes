@@ -8,48 +8,41 @@ import com.savvasg.offlinenotes.data.remote.SyncTransport
 import com.savvasg.offlinenotes.data.remote.dto.TransportException
 import javax.inject.Inject
 
-/** What the caller (the WorkManager worker) should do next, per §6 step 5. */
 sealed interface SyncOutcome {
-    /** Nothing left to do — no PENDING ops survived the round. */
     data object Done : SyncOutcome
 
     /**
-     * PENDING ops exist after a full round. Under this engine's design that can only be
-     * live-editing residue — a single freeze (§5) atomically grabs every currently-PENDING op,
-     * so nothing can "predate" it and survive a successful push+apply; the only way a PENDING
-     * row exists afterward is a fresh edit landing *during* that round. Caller re-enqueues with
-     * delay W (§6), not immediately, so a continuously-typing user isn't hammered.
+     * PENDING ops survived a full round, which can only be live-editing residue: one freeze grabs
+     * every currently-PENDING op atomically, so nothing can predate it and survive a successful
+     * push+apply. The caller re-enqueues with a delay so a continuously-typing user is not hammered.
      */
     data object PendingResidue : SyncOutcome
 
-    /** Push failed at the transport level (§7: retry the whole batch, same opIds). The ops stay
-     * IN_FLIGHT; the next run's step 0 ([NoteSyncOperations.resetStaleInFlight]) frees them for
-     * re-freezing. Caller maps this to `Result.retry()`. */
+    /**
+     * Push failed at the transport level, so the whole batch is retried with the same opIds. The ops
+     * stay IN_FLIGHT; the next run's [NoteSyncOperations.resetStaleInFlight] frees them for re-freezing.
+     */
     data object TransportFailure : SyncOutcome
 }
 
-/**
- * The sync engine (§6): one full pipeline run — crash recovery, freeze, push, apply, pull, loop
- * check. Every trigger (§6) funnels into [sync]; only *when* it's called differs.
- */
 class SyncEngine @Inject constructor(
     private val syncOperations: NoteSyncOperations,
     private val transport: SyncTransport,
 ) {
     suspend fun sync(): SyncOutcome {
-        syncOperations.resetStaleInFlight() // step 0: crash recovery
+        syncOperations.resetStaleInFlight()
 
-        val frozen = syncOperations.freezeAndDrain() // step 1: freeze txn, the linearization point
+        val frozen = syncOperations.freezeAndDrain()
         if (frozen.isNotEmpty()) {
             val results = try {
-                transport.pushOps(frozen.map { it.toOutgoingOp() }) // step 2
+                transport.pushOps(frozen.map { it.toOutgoingOp() })
             } catch (e: TransportException) {
                 return SyncOutcome.TransportFailure
             }
-            applyResults(results) // step 3: apply txn, one per op
+            applyResults(results)
         }
 
-        pullDelta() // step 4
+        pullDelta()
 
         return if (syncOperations.hasPendingOps()) SyncOutcome.PendingResidue else SyncOutcome.Done
     }
@@ -65,8 +58,8 @@ class SyncEngine @Inject constructor(
     }
 
     /**
-     * Push before pull, deliberately (§6): draining first shrinks the set of notes the pull must
-     * skip, and routes conflicts through the push response — the only path carrying base content.
+     * Push before pull, deliberately: draining first shrinks the set of notes the pull has to skip,
+     * and routes conflicts through the push response, the only path that carries base content.
      */
     private suspend fun pullDelta() {
         var since = syncOperations.currentSyncToken()
@@ -83,7 +76,7 @@ class SyncEngine @Inject constructor(
         }
     }
 
-    /** §7: token expired → clear it and re-bootstrap from a full current-state snapshot. */
+    /** Token expired: drop the cursor and re-apply a full current-state snapshot. */
     private suspend fun bootstrap() {
         var since: String? = null
         while (true) {

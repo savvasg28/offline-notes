@@ -26,10 +26,9 @@ object HttpModule {
     fun provideJson(): Json = Json { ignoreUnknownKeys = true }
 
     /**
-     * Retrofit needs an absolute base URL at build time, but §9 wants it changeable at runtime
-     * from the debug panel (emulator vs. physical device on the LAN). Fixed placeholder base +
-     * this interceptor rewriting scheme/host/port on every request from [TransportSettings],
-     * read live rather than captured once at Retrofit-build time.
+     * Retrofit needs an absolute base URL at build time, but the debug panel changes it at runtime.
+     * Hence a fixed placeholder base plus this interceptor, which rewrites scheme/host/port per
+     * request from [TransportSettings] — read live rather than captured when Retrofit is built.
      */
     @Provides
     @Singleton

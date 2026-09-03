@@ -37,11 +37,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.savvasg.offlinenotes.data.local.entity.NoteEntity
 import com.savvasg.offlinenotes.data.local.entity.OutboxEntity
 
-/**
- * Failure injection, the outbox inspector, and the current sync token (§10) — "a reviewer should
- * be able to open the debug screen, tap 'simulate concurrent device edit,' and watch the conflict
- * flow happen" (§9). Every action here is a single tap for exactly that reason.
- */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun DebugPanelScreen(
@@ -69,7 +64,7 @@ fun DebugPanelScreen(
         ) {
             item { SyncStatusSection(syncToken = uiState.syncToken, onForceSync = viewModel::forceSyncNow) }
 
-            item { SectionTitle("Transport (§9)") }
+            item { SectionTitle("Transport") }
             item {
                 TransportSection(
                     useHttpTransport = uiState.useHttpTransport,

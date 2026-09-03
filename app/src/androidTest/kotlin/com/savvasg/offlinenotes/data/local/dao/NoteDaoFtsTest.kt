@@ -17,10 +17,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * FTS5 DAO tests (§11), run on a real device/emulator: Robolectric's bundled SQLite lacks the
- * FTS5 extension (see [OfflineNotesDatabase.FTS_CALLBACK]'s kdoc), so search can only be verified
- * here — this is the one thing [com.savvasg.offlinenotes.data.local.database.NoteTransactionsTest] can't
- * cover.
+ * Runs on a real device: Robolectric's SQLite lacks FTS5 (see [OfflineNotesDatabase.FTS_CALLBACK]),
+ * so search can only be verified here.
  */
 @RunWith(AndroidJUnit4::class)
 class NoteDaoFtsTest {

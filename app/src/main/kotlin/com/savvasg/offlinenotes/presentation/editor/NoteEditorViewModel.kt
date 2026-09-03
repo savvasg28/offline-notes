@@ -83,10 +83,9 @@ class NoteEditorViewModel @Inject constructor(
 
     /**
      * Idempotent per edit session, deliberately: NoteEditorScreen wires this to both ON_STOP and
-     * onDispose, which can both fire for one navigation-away. Without clearing [hasUserEdited] the
-     * second call re-runs writeTxn on unchanged content, resetting syncState to PENDING and
-     * clobbering a CONFLICT the first call's sync had already staged. Caught live; guarded by
-     * NoteEditorViewModelTest.
+     * onDispose, which can both fire for a single navigation away. Without clearing [hasUserEdited]
+     * the second call re-runs the write on unchanged content, resetting syncState to PENDING and
+     * clobbering a CONFLICT the first call's sync had already staged.
      */
     fun flush() {
         if (!hasUserEdited) return

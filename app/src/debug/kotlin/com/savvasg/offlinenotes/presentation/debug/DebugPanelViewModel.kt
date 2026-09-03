@@ -7,7 +7,6 @@ import com.savvasg.offlinenotes.data.local.dao.OutboxDao
 import com.savvasg.offlinenotes.data.local.dao.SyncMetaDao
 import com.savvasg.offlinenotes.data.local.entity.NoteEntity
 import com.savvasg.offlinenotes.data.local.entity.OutboxEntity
-import com.savvasg.offlinenotes.data.remote.SyncTransport
 import com.savvasg.offlinenotes.data.remote.TransportSettings
 import com.savvasg.offlinenotes.data.remote.fake.FakeTransport
 import com.savvasg.offlinenotes.sync.SyncScheduler
@@ -18,15 +17,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 
-/**
- * Backs the debug panel: failure injection, the outbox inspector, the current sync token, and
- * force-sync. Injects [FakeTransport] directly rather than going through
- * [com.savvasg.offlinenotes.data.remote.SyncTransport] — these controls aren't part of the
- * transport contract any real implementation would expose to callers, they're demo/test
- * scaffolding specific to the stub. (They have no effect when the debug panel's "Use HTTP
- * transport" toggle is on — that path is real HTTP against whatever Mockoon/real server is
- * configured, which has its own way of scripting responses.)
- */
 data class DebugPanelUiState(
     val outboxOps: List<OutboxEntity> = emptyList(),
     val syncToken: String? = null,
@@ -60,8 +50,7 @@ class DebugPanelViewModel @Inject constructor(
     fun setLatency(minMillis: Long, maxMillis: Long) = fakeTransport.setLatencyMillis(minMillis..maxMillis)
     fun clearLatency() = fakeTransport.setLatencyMillis(null)
 
-    /** One tap: queues a Conflict for this note's next push, and its remote content — no
-     * separate "simulate Device B" step needed, since there's no real server state to write to. */
+    /** Queues both the Conflict result and its remote content, since there is no server state to write. */
     fun forceConflictOnNextPush(noteId: String) = fakeTransport.forceConflictOnNextPush(noteId)
 
     fun forceRejectedOnNextPush(noteId: String) =

@@ -13,10 +13,9 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * `KEEP`/`REPLACE`/`APPEND_OR_REPLACE` are exactly what implement §6's "subsequent edits are
- * no-ops" and the residue-reschedule race documented on [SyncScheduler.rescheduleAfterResidue] —
- * these tests exercise that policy choice directly against a real (test) WorkManager, rather than
- * just trusting the enqueue calls compile.
+ * `KEEP`/`REPLACE`/`APPEND_OR_REPLACE` are what implement "subsequent edits are no-ops" and the
+ * residue-reschedule race documented on [SyncScheduler.rescheduleAfterResidue], so these exercise
+ * that policy choice against a real (test) WorkManager rather than trusting the calls compile.
  */
 @RunWith(RobolectricTestRunner::class)
 class SyncSchedulerTest {

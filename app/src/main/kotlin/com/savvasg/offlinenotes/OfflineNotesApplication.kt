@@ -27,11 +27,10 @@ class OfflineNotesApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
 
-        syncScheduler.schedulePeriodicBackstop() // long-interval backstop (§6); KEEP no-ops after the first launch
+        syncScheduler.schedulePeriodicBackstop()
 
-        // App foreground (§6): the primary freshness mechanism. ProcessLifecycleOwner's ON_START
-        // fires once per foreground entry, not per Activity, so backgrounding then returning
-        // triggers exactly one sync rather than one per screen.
+        // ProcessLifecycleOwner's ON_START fires once per foreground entry rather than per Activity,
+        // so returning from the background triggers exactly one sync instead of one per screen.
         ProcessLifecycleOwner.get().lifecycle.addObserver(
             object : DefaultLifecycleObserver {
                 override fun onStart(owner: LifecycleOwner) {

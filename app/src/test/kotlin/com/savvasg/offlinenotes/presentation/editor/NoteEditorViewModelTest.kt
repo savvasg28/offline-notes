@@ -22,11 +22,9 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * Regression test for a bug caught live (§ NoteEditorViewModel.flush kdoc): [NoteEditorScreen]
- * wires [NoteEditorViewModel.flush] to both ON_STOP and onDispose, which can both fire for the
- * same navigation-away. Before this fix, a second immediate flush() call re-ran writeTxn on
- * unchanged content, unconditionally resetting syncState to PENDING — clobbering a CONFLICT the
- * first call's sync had already staged in the meantime.
+ * Regression test for [NoteEditorViewModel.flush] being wired to both ON_STOP and onDispose: before
+ * the fix, the second call re-ran the write on unchanged content and reset syncState to PENDING,
+ * clobbering a CONFLICT the first call's sync had already staged.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class) // SavedStateHandle(route = ...) encodes via android.net.Uri

@@ -6,7 +6,6 @@ import androidx.room.RawQuery
 import androidx.room.RoomRawQuery
 import androidx.room.Upsert
 import androidx.sqlite.SQLiteStatement
-import com.savvasg.offlinenotes.data.local.database.OfflineNotesDatabase
 import com.savvasg.offlinenotes.data.local.entity.NoteEntity
 import com.savvasg.offlinenotes.domain.model.SyncState
 import kotlinx.coroutines.flow.Flow
@@ -25,7 +24,6 @@ interface NoteDao {
     @Query("SELECT * FROM notes WHERE isDeleted = 0 ORDER BY lastUpdated DESC")
     fun observeActiveNotes(): Flow<List<NoteEntity>>
 
-    /** Bootstrap re-sync (§7): candidates for "deleted server-side, absent from the snapshot". */
     @Query("SELECT * FROM notes WHERE serverVersion IS NOT NULL")
     suspend fun getAllSyncedNotes(): List<NoteEntity>
 
@@ -38,16 +36,14 @@ interface NoteDao {
     @Query("UPDATE notes SET isDeleted = :isDeleted, lastUpdated = :now WHERE id = :id")
     suspend fun updateIsDeleted(id: String, isDeleted: Boolean, now: Long)
 
-    /** Only safe to call once no outbox row references the note (FK is ON DELETE RESTRICT). */
+    /** Only safe once no outbox row references the note (the FK is ON DELETE RESTRICT). */
     @Query("DELETE FROM notes WHERE id = :id")
     suspend fun purge(id: String)
 
-    // notes_fts is created via raw SQL (OfflineNotesDatabase.FTS_CALLBACK) since FTS5 has no Room
-    // annotation — Room can neither verify this SQL at compile time nor parse notes_fts out of it
-    // for Flow invalidation, so it's a @RawQuery with the observed table declared explicitly.
-    // notes_fts changes only as a trigger-driven side effect of `notes` changing within the same
-    // transaction, so observing NoteEntity is sufficient — the FTS index is never stale by the
-    // time an invalidation fires.
+    // FTS5 has no Room annotation, so Room can neither verify this SQL nor discover notes_fts for
+    // Flow invalidation — hence @RawQuery with the observed table declared explicitly. notes_fts only
+    // changes as a trigger side effect of `notes` changing in the same transaction, so observing
+    // NoteEntity is sufficient.
     @RawQuery(observedEntities = [NoteEntity::class])
     fun searchActiveNotesRaw(query: RoomRawQuery): Flow<List<NoteEntity>>
 }
