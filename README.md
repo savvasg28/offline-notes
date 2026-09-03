@@ -53,8 +53,8 @@ impl). `sync` is a peer of `data`, not a child of it — the engine and the UI b
 the repository, neither on top of the other.
 
 **This repo owns the client only.** There's no owned reference server implementation: the app is
-a correct client of a wire contract (`OutgoingOp`/`OpResult`/`DeltaPage`, defined in
-[`sync/transport/Contract.kt`](app/src/main/kotlin/com/savvasg/offlinenotes/sync/transport/Contract.kt)),
+a correct client of a wire contract — specified in [`openapi/offline-notes.yaml`](openapi/offline-notes.yaml)
+and typed in [`data/remote/dto/RemoteDtos.kt`](app/src/main/kotlin/com/savvasg/offlinenotes/data/remote/dto/RemoteDtos.kt) —
 and whatever answers on the other end of `HttpTransport` — a real backend, or the
 [Mockoon environment](mockoon/) checked in here — is out of scope for what this repo
 demonstrates. `FakeTransport`, the zero-setup default, is a stateless scriptable stub for the

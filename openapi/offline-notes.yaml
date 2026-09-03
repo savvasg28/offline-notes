@@ -1,0 +1,325 @@
+openapi: 3.1.0
+
+info:
+  title: Offline Notes sync API
+  version: "1.0.0"
+  summary: The wire contract this client speaks; the server side lives elsewhere.
+  description: |
+    The contract behind `SyncTransport`. This repository contains only the client, so this document
+    is the specification a server (or the Mockoon environment in `mockoon/`) has to satisfy — not a
+    description of an implementation kept here.
+
+    Rules that are part of the contract but cannot be expressed in the schemas below:
+
+    - **Per-op independence.** One conflicting or rejected op never fails the batch. `POST /push`
+      returns exactly one result per submitted op, in request order.
+    - **Idempotency.** `opId` is the idempotency key. A replayed `opId` returns the stored original
+      result and must not re-execute the operation. Clients replay after a crash or a dropped
+      response, so this is what keeps a retry from double-applying an edit.
+    - **Results versus failures.** `Conflict` and `Rejected` are 200 results. Auth failure, rate
+      limiting, and server errors are HTTP failures, and the client retries the whole batch with the
+      same `opId`s.
+    - **Opaque cursor.** `syncToken` is stored, echoed back, and never parsed by the client. Its
+      format is the server's business entirely.
+    - **Compare-and-swap.** An op whose `baseVersion` does not match the note's current server-side
+      version conflicts. The conflict response carries the remote side, and the base side when the
+      server's history still reaches `baseVersion`.
+
+servers:
+  - url: http://10.0.2.2:8080
+    description: Android emulator reaching a server on the host machine.
+  - url: http://localhost:8080
+    description: Mockoon environment from `mockoon/offline-notes.json`.
+
+paths:
+  /push:
+    post:
+      operationId: pushOps
+      summary: Submit a frozen batch of outbox operations.
+      description: |
+        Sent once per sync round, after the client has frozen its outbox. The response array must
+        pair up with the request array one-for-one, in order.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/OutgoingOp"
+            examples:
+              create:
+                summary: A note that has never been synced
+                value:
+                  - opId: 6f1e9c40-0f0c-4f1a-9c2e-2f3b8c9d1a55
+                    type: CREATE
+                    noteId: 9b2d1f88-1c44-4a0e-9f3d-77c1b0a2e401
+                    baseVersion: null
+                    title: Shopping list
+                    body: Milk, bread
+              update:
+                summary: An edit against a known server version
+                value:
+                  - opId: 8a4c2d10-77b9-4a25-8f6e-3a1d5c7e9b02
+                    type: UPDATE
+                    noteId: 9b2d1f88-1c44-4a0e-9f3d-77c1b0a2e401
+                    baseVersion: "7"
+                    title: Shopping list
+                    body: Milk, bread, coffee
+      responses:
+        "200":
+          description: One result per submitted op, in request order.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OpResult"
+              examples:
+                applied:
+                  value:
+                    - type: Applied
+                      opId: 6f1e9c40-0f0c-4f1a-9c2e-2f3b8c9d1a55
+                      newVersion: "8"
+                conflict:
+                  value:
+                    - type: Conflict
+                      opId: 8a4c2d10-77b9-4a25-8f6e-3a1d5c7e9b02
+                      baseVersion: "7"
+                      baseTitle: Shopping list
+                      baseBody: Milk, bread
+                      remoteVersion: "9"
+                      remoteTitle: Shopping list
+                      remoteBody: Milk, bread, tea
+                rejected:
+                  value:
+                    - type: Rejected
+                      opId: 8a4c2d10-77b9-4a25-8f6e-3a1d5c7e9b02
+                      code: NOTE_TOO_LARGE
+                      message: Note body exceeds the maximum size
+        "401":
+          $ref: "#/components/responses/AuthFailure"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /pull:
+    get:
+      operationId: pullDelta
+      summary: Fetch one page of changes since a cursor.
+      description: |
+        Omitting `since` requests a bootstrap: a full current-state snapshot rather than a delta.
+        The client also re-bootstraps this way after a `410`.
+      parameters:
+        - name: since
+          in: query
+          required: false
+          description: |
+            The `nextSyncToken` from the previous page. Absent on the very first sync and after the
+            cursor has expired.
+          schema:
+            type: string
+          example: "42"
+      responses:
+        "200":
+          description: A page of changes and the cursor that follows it.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeltaPage"
+              examples:
+                changes:
+                  value:
+                    notes:
+                      - noteId: 9b2d1f88-1c44-4a0e-9f3d-77c1b0a2e401
+                        version: "9"
+                        deleted: false
+                        title: Shopping list
+                        body: Milk, bread, tea
+                      - noteId: 0d7a3b21-5e88-4c13-b0a9-6f2e4d8c1177
+                        version: "10"
+                        deleted: true
+                        title: null
+                        body: null
+                    nextSyncToken: "10"
+                    hasMore: false
+                empty:
+                  summary: Nothing changed; the cursor is unchanged
+                  value:
+                    notes: []
+                    nextSyncToken: "42"
+                    hasMore: false
+        "401":
+          $ref: "#/components/responses/AuthFailure"
+        "410":
+          description: |
+            The cursor no longer reaches far enough back into history. The client discards it and
+            re-bootstraps with no `since`.
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /health:
+    get:
+      operationId: health
+      summary: Liveness probe, used to check a mock or server is reachable.
+      responses:
+        "200":
+          description: The server is up.
+
+components:
+  responses:
+    AuthFailure:
+      description: Authentication failed. The client retries the whole batch with the same opIds.
+    RateLimited:
+      description: Rate limited. The client retries the whole batch with the same opIds.
+    ServerError:
+      description: Server error. The client retries the whole batch with the same opIds.
+
+  schemas:
+    OpType:
+      type: string
+      description: |
+        Decided by whether the note has a server version yet, never by how many times it was edited.
+      enum: [CREATE, UPDATE, DELETE]
+
+    OutgoingOp:
+      type: object
+      additionalProperties: false
+      required: [opId, type, noteId, baseVersion, title, body]
+      properties:
+        opId:
+          type: string
+          description: Idempotency key. Stable across retries of the same operation.
+        type:
+          $ref: "#/components/schemas/OpType"
+        noteId:
+          type: string
+          description: Client-generated note identifier, so a note has an id before it ever syncs.
+        baseVersion:
+          type: [string, "null"]
+          description: |
+            The version this edit was made against, for compare-and-swap. Null when the note has
+            never been synced, which is also when `type` is CREATE.
+        title:
+          type: [string, "null"]
+          description: Null for DELETE, which carries no payload.
+        body:
+          type: [string, "null"]
+          description: Null for DELETE, which carries no payload.
+
+    OpResult:
+      description: |
+        One push result. The `type` discriminator is a short, stable string, deliberately unrelated
+        to any class name on either side.
+      oneOf:
+        - $ref: "#/components/schemas/OpResultApplied"
+        - $ref: "#/components/schemas/OpResultConflict"
+        - $ref: "#/components/schemas/OpResultRejected"
+      discriminator:
+        propertyName: type
+        mapping:
+          Applied: "#/components/schemas/OpResultApplied"
+          Conflict: "#/components/schemas/OpResultConflict"
+          Rejected: "#/components/schemas/OpResultRejected"
+
+    OpResultApplied:
+      type: object
+      additionalProperties: false
+      required: [type, opId, newVersion]
+      properties:
+        type:
+          type: string
+          const: Applied
+        opId:
+          type: string
+        newVersion:
+          type: string
+          description: The note's version after this op. Becomes the base for the next push.
+
+    OpResultConflict:
+      type: object
+      description: |
+        The op's `baseVersion` did not match. The server keeps its own state and returns the remote
+        side; the client stages the conflict for the user and never auto-merges.
+      additionalProperties: false
+      required: [type, opId, baseVersion, baseTitle, baseBody, remoteVersion, remoteTitle, remoteBody]
+      properties:
+        type:
+          type: string
+          const: Conflict
+        opId:
+          type: string
+        baseVersion:
+          type: [string, "null"]
+          description: Echo of the op's baseVersion.
+        baseTitle:
+          type: [string, "null"]
+          description: |
+            Null when the server's history no longer reaches `baseVersion`. The client then shows a
+            two-way local-vs-remote comparison instead of a three-way one.
+        baseBody:
+          type: [string, "null"]
+        remoteVersion:
+          type: string
+        remoteTitle:
+          type: string
+        remoteBody:
+          type: string
+
+    OpResultRejected:
+      type: object
+      description: |
+        The op will never succeed as submitted. The client drops it rather than retrying, so this is
+        for permanent refusals, not transient failure.
+      additionalProperties: false
+      required: [type, opId, code, message]
+      properties:
+        type:
+          type: string
+          const: Rejected
+        opId:
+          type: string
+        code:
+          type: string
+          description: Stable, machine-readable reason.
+        message:
+          type: string
+          description: Human-readable detail, for logs and the debug panel.
+
+    RemoteNote:
+      type: object
+      additionalProperties: false
+      required: [noteId, version, deleted, title, body]
+      properties:
+        noteId:
+          type: string
+        version:
+          type: string
+        deleted:
+          type: boolean
+          description: True for a tombstone, in which case `title` and `body` are null.
+        title:
+          type: [string, "null"]
+        body:
+          type: [string, "null"]
+
+    DeltaPage:
+      type: object
+      additionalProperties: false
+      required: [notes, nextSyncToken, hasMore]
+      properties:
+        notes:
+          type: array
+          items:
+            $ref: "#/components/schemas/RemoteNote"
+        nextSyncToken:
+          type: string
+          description: |
+            The cursor to send as `since` next time. The client commits it in the same transaction
+            as the page it accompanies, so a crash cannot skip changes.
+        hasMore:
+          type: boolean
+          description: True when another page is immediately available for `nextSyncToken`.

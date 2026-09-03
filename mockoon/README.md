@@ -4,6 +4,11 @@
 app's wire contract (`POST /push`, `GET /pull`, `GET /health`) with static/rule-based responses —
 this repo doesn't own backend semantics, so this is scripted mock data, not a real server.
 
+The contract these responses have to satisfy is specified in
+[`openapi/offline-notes.yaml`](../openapi/offline-notes.yaml), including the rules the schemas
+can't express: per-op independence, `opId` idempotency, results versus HTTP failures, and the
+opaque cursor.
+
 ## Run it
 
 **CLI (no install required):**
