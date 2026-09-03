@@ -36,12 +36,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.savvasg.offlinenotes.domain.model.SyncState
 import com.savvasg.offlinenotes.domain.model.NoteListItem
+import com.savvasg.offlinenotes.domain.model.SyncState
 import java.text.DateFormat
 import java.util.Date
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotesListScreen(
     onNoteClick: (String) -> Unit,
@@ -51,7 +50,29 @@ fun NotesListScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    NotesListContent(
+        uiState = uiState,
+        onSearchQueryChange = viewModel::onSearchQueryChange,
+        onNoteClick = onNoteClick,
+        onDeleteNote = viewModel::onDeleteNote,
+        onNewNote = { onNewNote(viewModel.newNoteId()) },
+        onOpenDebugPanel = onOpenDebugPanel,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NotesListContent(
+    uiState: NotesListUiState,
+    onSearchQueryChange: (String) -> Unit,
+    onNoteClick: (String) -> Unit,
+    onDeleteNote: (String) -> Unit,
+    onNewNote: () -> Unit,
+    onOpenDebugPanel: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
     Scaffold(
+        modifier = modifier,
         topBar = {
             TopAppBar(
                 title = { Text("Offline Notes") },
@@ -66,7 +87,7 @@ fun NotesListScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { onNewNote(viewModel.newNoteId()) }) {
+            FloatingActionButton(onClick = onNewNote) {
                 Icon(Icons.Default.Add, contentDescription = "New note")
             }
         },
@@ -74,7 +95,7 @@ fun NotesListScreen(
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             TextField(
                 value = uiState.searchQuery,
-                onValueChange = viewModel::onSearchQueryChange,
+                onValueChange = onSearchQueryChange,
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 placeholder = { Text("Search notes") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
@@ -94,7 +115,7 @@ fun NotesListScreen(
                         NoteRow(
                             note = note,
                             onClick = { onNoteClick(note.id) },
-                            onDelete = { viewModel.onDeleteNote(note.id) },
+                            onDelete = { onDeleteNote(note.id) },
                         )
                     }
                 }

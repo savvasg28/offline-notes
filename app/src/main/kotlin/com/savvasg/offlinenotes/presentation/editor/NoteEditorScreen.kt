@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -34,7 +35,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.savvasg.offlinenotes.domain.model.SyncState
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NoteEditorScreen(
     onBack: () -> Unit,
@@ -58,7 +58,27 @@ fun NoteEditorScreen(
         }
     }
 
+    NoteEditorContent(
+        uiState = uiState,
+        onTitleChange = viewModel::onTitleChange,
+        onBodyChange = viewModel::onBodyChange,
+        onBack = onBack,
+        onResolveConflict = { onResolveConflict(viewModel.noteId) },
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NoteEditorContent(
+    uiState: NoteEditorUiState,
+    onTitleChange: (String) -> Unit,
+    onBodyChange: (String) -> Unit,
+    onBack: () -> Unit,
+    onResolveConflict: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Scaffold(
+        modifier = modifier,
         topBar = {
             TopAppBar(
                 title = {},
@@ -72,38 +92,36 @@ fun NoteEditorScreen(
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp)) {
             if (uiState.syncState == SyncState.CONFLICT) {
-                ConflictBanner(onClick = { onResolveConflict(viewModel.noteId) })
+                ConflictBanner(onClick = onResolveConflict)
             }
             TextField(
                 value = uiState.title,
-                onValueChange = viewModel::onTitleChange,
+                onValueChange = onTitleChange,
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("Title") },
                 textStyle = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                colors = TextFieldDefaults.colors(
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                    focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                ),
+                colors = seamlessTextFieldColors(),
                 singleLine = true,
             )
             TextField(
                 value = uiState.body,
-                onValueChange = viewModel::onBodyChange,
+                onValueChange = onBodyChange,
                 modifier = Modifier.fillMaxSize(),
                 placeholder = { Text("Note") },
                 textStyle = MaterialTheme.typography.bodyLarge,
-                colors = TextFieldDefaults.colors(
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                    focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                ),
+                colors = seamlessTextFieldColors(),
             )
         }
     }
 }
+
+@Composable
+private fun seamlessTextFieldColors() = TextFieldDefaults.colors(
+    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+    focusedContainerColor = MaterialTheme.colorScheme.surface,
+    unfocusedIndicatorColor = Color.Transparent,
+    focusedIndicatorColor = Color.Transparent,
+)
 
 @Composable
 private fun ConflictBanner(onClick: () -> Unit) {

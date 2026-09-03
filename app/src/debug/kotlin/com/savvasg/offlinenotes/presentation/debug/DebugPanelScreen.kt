@@ -37,7 +37,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.savvasg.offlinenotes.data.local.entity.NoteEntity
 import com.savvasg.offlinenotes.data.local.entity.OutboxEntity
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun DebugPanelScreen(
     onBack: () -> Unit,
@@ -45,7 +44,43 @@ fun DebugPanelScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    DebugPanelContent(
+        uiState = uiState,
+        onBack = onBack,
+        onForceSync = viewModel::forceSyncNow,
+        onUseHttpTransportChange = viewModel::setUseHttpTransport,
+        onBaseUrlChange = viewModel::setBaseUrl,
+        onAddLatency = { viewModel.setLatency(LATENCY_MIN_MILLIS, LATENCY_MAX_MILLIS) },
+        onClearLatency = viewModel::clearLatency,
+        onExpireToken = viewModel::expireTokenOnNextPull,
+        onForceRateLimit = viewModel::forceRateLimitOnNextCall,
+        onForceAuthFailure = viewModel::forceAuthFailureOnNextCall,
+        onForceConflict = viewModel::forceConflictOnNextPush,
+        onForceRejected = viewModel::forceRejectedOnNextPush,
+        onDropNextResponse = viewModel::dropNextResponseFor,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+fun DebugPanelContent(
+    uiState: DebugPanelUiState,
+    onBack: () -> Unit,
+    onForceSync: () -> Unit,
+    onUseHttpTransportChange: (Boolean) -> Unit,
+    onBaseUrlChange: (String) -> Unit,
+    onAddLatency: () -> Unit,
+    onClearLatency: () -> Unit,
+    onExpireToken: () -> Unit,
+    onForceRateLimit: () -> Unit,
+    onForceAuthFailure: () -> Unit,
+    onForceConflict: (String) -> Unit,
+    onForceRejected: (String) -> Unit,
+    onDropNextResponse: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Scaffold(
+        modifier = modifier,
         topBar = {
             TopAppBar(
                 title = { Text("Debug panel") },
@@ -62,26 +97,26 @@ fun DebugPanelScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            item { SyncStatusSection(syncToken = uiState.syncToken, onForceSync = viewModel::forceSyncNow) }
+            item { SyncStatusSection(syncToken = uiState.syncToken, onForceSync = onForceSync) }
 
             item { SectionTitle("Transport") }
             item {
                 TransportSection(
                     useHttpTransport = uiState.useHttpTransport,
                     baseUrl = uiState.baseUrl,
-                    onUseHttpTransportChange = viewModel::setUseHttpTransport,
-                    onBaseUrlChange = viewModel::setBaseUrl,
+                    onUseHttpTransportChange = onUseHttpTransportChange,
+                    onBaseUrlChange = onBaseUrlChange,
                 )
             }
 
             item { SectionTitle("Global failure injection") }
             item {
                 FlowActions {
-                    OutlinedButton(onClick = { viewModel.setLatency(500, 2000) }) { Text("Add latency (0.5-2s)") }
-                    OutlinedButton(onClick = viewModel::clearLatency) { Text("Clear latency") }
-                    OutlinedButton(onClick = viewModel::expireTokenOnNextPull) { Text("Expire sync token") }
-                    OutlinedButton(onClick = viewModel::forceRateLimitOnNextCall) { Text("Force rate limit (next call)") }
-                    OutlinedButton(onClick = viewModel::forceAuthFailureOnNextCall) { Text("Force auth failure (next call)") }
+                    OutlinedButton(onClick = onAddLatency) { Text("Add latency (0.5-2s)") }
+                    OutlinedButton(onClick = onClearLatency) { Text("Clear latency") }
+                    OutlinedButton(onClick = onExpireToken) { Text("Expire sync token") }
+                    OutlinedButton(onClick = onForceRateLimit) { Text("Force rate limit (next call)") }
+                    OutlinedButton(onClick = onForceAuthFailure) { Text("Force auth failure (next call)") }
                 }
             }
 
@@ -90,7 +125,11 @@ fun DebugPanelScreen(
                 item { Text("No notes yet.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             items(uiState.activeNotes, key = { it.id }) { note ->
-                NoteActionsCard(note = note, viewModel = viewModel)
+                NoteActionsCard(
+                    note = note,
+                    onForceConflict = { onForceConflict(note.id) },
+                    onForceRejected = { onForceRejected(note.id) },
+                )
             }
 
             item { SectionTitle("Outbox inspector (${uiState.outboxOps.size} op${if (uiState.outboxOps.size == 1) "" else "s"})") }
@@ -98,7 +137,7 @@ fun DebugPanelScreen(
                 item { Text("Outbox is empty — everything is synced.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             items(uiState.outboxOps, key = { it.opId }) { op ->
-                OutboxRow(op = op, onDropNextResponse = { viewModel.dropNextResponseFor(op.opId) })
+                OutboxRow(op = op, onDropNextResponse = { onDropNextResponse(op.opId) })
             }
         }
     }
@@ -130,7 +169,7 @@ private fun TransportSection(
     Card(colors = CardDefaults.cardColors()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Use HTTP transport (:server demo)", style = MaterialTheme.typography.bodyMedium)
+                Text("Use HTTP transport", style = MaterialTheme.typography.bodyMedium)
                 Switch(checked = useHttpTransport, onCheckedChange = onUseHttpTransportChange)
             }
             if (useHttpTransport) {
@@ -155,13 +194,13 @@ private fun FlowActions(content: @Composable FlowRowScope.() -> Unit) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun NoteActionsCard(note: NoteEntity, viewModel: DebugPanelViewModel) {
+private fun NoteActionsCard(note: NoteEntity, onForceConflict: () -> Unit, onForceRejected: () -> Unit) {
     Card(colors = CardDefaults.cardColors()) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(note.title.ifBlank { "Untitled" }, style = MaterialTheme.typography.titleSmall)
             FlowActions {
-                OutlinedButton(onClick = { viewModel.forceConflictOnNextPush(note.id) }) { Text("Force conflict (next push)") }
-                OutlinedButton(onClick = { viewModel.forceRejectedOnNextPush(note.id) }) { Text("Force rejection (next push)") }
+                OutlinedButton(onClick = onForceConflict) { Text("Force conflict (next push)") }
+                OutlinedButton(onClick = onForceRejected) { Text("Force rejection (next push)") }
             }
         }
     }
@@ -181,3 +220,6 @@ private fun OutboxRow(op: OutboxEntity, onDropNextResponse: () -> Unit) {
         }
     }
 }
+
+private const val LATENCY_MIN_MILLIS = 500L
+private const val LATENCY_MAX_MILLIS = 2000L

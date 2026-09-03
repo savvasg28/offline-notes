@@ -29,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConflictResolutionScreen(
     onResolved: () -> Unit,
@@ -38,7 +37,31 @@ fun ConflictResolutionScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    ConflictResolutionContent(
+        uiState = uiState,
+        onUseMine = viewModel::useMine,
+        onUseTheirs = viewModel::useTheirs,
+        onDraftTitleChange = viewModel::onDraftTitleChange,
+        onDraftBodyChange = viewModel::onDraftBodyChange,
+        onResolve = { viewModel.resolve(onResolved) },
+        onBack = onBack,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ConflictResolutionContent(
+    uiState: ConflictResolutionUiState,
+    onUseMine: () -> Unit,
+    onUseTheirs: () -> Unit,
+    onDraftTitleChange: (String) -> Unit,
+    onDraftBodyChange: (String) -> Unit,
+    onResolve: () -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Scaffold(
+        modifier = modifier,
         topBar = {
             TopAppBar(
                 title = { Text("Resolve conflict") },
@@ -50,8 +73,8 @@ fun ConflictResolutionScreen(
             )
         },
     ) { padding ->
-        val current = uiState.conflict
-        if (current == null) {
+        val conflict = uiState.conflict
+        if (conflict == null) {
             Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
                 Text("No conflict to resolve.", style = MaterialTheme.typography.bodyLarge)
             }
@@ -71,10 +94,10 @@ fun ConflictResolutionScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            item { VersionCard(label = "Local (yours)", title = current.localTitle, body = current.localBody) }
+            item { VersionCard(label = "Local (yours)", title = conflict.localTitle, body = conflict.localBody) }
             item {
-                if (current.baseTitle != null && current.baseBody != null) {
-                    VersionCard(label = "Base (common ancestor)", title = current.baseTitle, body = current.baseBody)
+                if (conflict.baseTitle != null && conflict.baseBody != null) {
+                    VersionCard(label = "Base (common ancestor)", title = conflict.baseTitle, body = conflict.baseBody)
                 } else {
                     Text(
                         "No common history available — showing local vs. remote only.",
@@ -83,33 +106,30 @@ fun ConflictResolutionScreen(
                     )
                 }
             }
-            item { VersionCard(label = "Remote (other device)", title = current.remoteTitle, body = current.remoteBody) }
+            item { VersionCard(label = "Remote (other device)", title = conflict.remoteTitle, body = conflict.remoteBody) }
 
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Resolution", style = MaterialTheme.typography.titleMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = viewModel::useMine) { Text("Keep mine") }
-                        OutlinedButton(onClick = viewModel::useTheirs) { Text("Keep theirs") }
+                        OutlinedButton(onClick = onUseMine) { Text("Keep mine") }
+                        OutlinedButton(onClick = onUseTheirs) { Text("Keep theirs") }
                     }
                     TextField(
                         value = uiState.draftTitle,
-                        onValueChange = viewModel::onDraftTitleChange,
+                        onValueChange = onDraftTitleChange,
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("Title") },
                         singleLine = true,
                     )
                     TextField(
                         value = uiState.draftBody,
-                        onValueChange = viewModel::onDraftBodyChange,
+                        onValueChange = onDraftBodyChange,
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("Note") },
                         minLines = 4,
                     )
-                    Button(
-                        onClick = { viewModel.resolve(onResolved) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
+                    Button(onClick = onResolve, modifier = Modifier.fillMaxWidth()) {
                         Text("Resolve")
                     }
                 }
