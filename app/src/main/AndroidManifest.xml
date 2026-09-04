@@ -13,16 +13,6 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.OfflineNotes">
 
-        <!--
-          Implementing Configuration.Provider on the Application class is not, by itself,
-          enough to make WorkManager use our HiltWorkerFactory: the library's own default
-          on-demand initializer still needs to be disabled here, or the androidx.startup
-          ContentProvider initializes WorkManager with the default (non-Hilt) factory before
-          Application.onCreate() ever runs, and the first WorkManager.getInstance() call — ours,
-          in SyncModule — just returns that already-initialized singleton. Confirmed live: without
-          this, SyncWorker fails with "NoSuchMethodException: SyncWorker.<init>(Context,
-          WorkerParameters)", since Hilt workers don't have that plain constructor.
-        -->
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"

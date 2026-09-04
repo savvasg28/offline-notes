@@ -16,10 +16,6 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/**
- * Runs on a real device: Robolectric's SQLite lacks FTS5 (see [OfflineNotesDatabase.FTS_CALLBACK]),
- * so search can only be verified here.
- */
 @RunWith(AndroidJUnit4::class)
 class NoteDaoFtsTest {
 
@@ -101,6 +97,5 @@ class NoteDaoFtsTest {
         assertThat(noteDao.searchActiveNotes(buildFtsMatchQueryForTest("renamed")).first()).hasSize(1)
     }
 
-    /** Mirrors NoteRepositoryImpl's private query-builder — see its own tests for the string logic. */
     private fun buildFtsMatchQueryForTest(term: String) = "\"$term\"*"
 }

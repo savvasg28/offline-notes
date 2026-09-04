@@ -22,14 +22,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/**
- * Wires the real [NoteRepositoryImpl] + Room (schema only — see NoteTransactionsTest for why FTS5
- * is excluded) to a scripted [FakeTransport], driven through [SyncEngine]. No Hilt: everything is
- * small enough to construct directly.
- *
- * [FakeTransport] is a stateless stub rather than a simulated server, so each test scripts exactly
- * the responses its scenario needs instead of driving real server-side version state.
- */
 @RunWith(RobolectricTestRunner::class)
 class SyncEngineTest {
 
@@ -46,8 +38,6 @@ class SyncEngineTest {
             .allowMainThreadQueries()
             .build()
         val transactions = NoteTransactions(db, db.noteDao(), db.outboxDao(), db.conflictDao(), db.syncMetaDao())
-        // SyncScheduler just wraps WorkManager scheduling — irrelevant to these tests, which
-        // drive SyncEngine.sync() directly rather than through the trigger layer.
         repository = NoteRepositoryImpl(
             db.noteDao(),
             db.outboxDao(),
@@ -81,8 +71,6 @@ class SyncEngineTest {
     fun `crash_between_send_and_ack_replays_safely - end to end through the engine`() = runTest {
         repository.saveNote("note-1", "T", "B")
 
-        // The first attempt: freeze + push succeed (server applies), but the process dies before
-        // the local apply txn runs — the ack is never processed.
         val frozen = repository.freezeAndDrain()
         val opId = frozen.single().opId
         val pushed = transport.pushOps(frozen.map { it.toOutgoingOp() })
@@ -90,9 +78,6 @@ class SyncEngineTest {
 
         assertThat(db.outboxDao().getById(opId)!!.status).isEqualTo(OutboxStatus.IN_FLIGHT)
 
-        // App restarts; the engine resets the stale IN_FLIGHT op and re-freezes it under the same
-        // opId. There is no server-side dedupe to assert against here — what the client must
-        // guarantee is that it replays the identical op rather than fabricating a new one.
         val outcome = engine.sync()
 
         assertThat(outcome).isEqualTo(SyncOutcome.Done)
@@ -103,7 +88,7 @@ class SyncEngineTest {
     @Test
     fun `a forced conflict surfaces as a staged conflict, not a crash or silent overwrite`() = runTest {
         repository.saveNote("note-1", "Mine", "Mine body")
-        engine.sync() // lands SYNCED
+        engine.sync()
 
         transport.forceConflictOnNextPush("note-1", "Device B Title", "Device B Body")
         repository.saveNote("note-1", "My Edit", "My Edit Body")
@@ -113,7 +98,7 @@ class SyncEngineTest {
         assertThat(outcome).isEqualTo(SyncOutcome.Done)
         val note = repository.observeNote("note-1").first()!!
         assertThat(note.syncState).isEqualTo(SyncState.CONFLICT)
-        assertThat(note.title).isEqualTo("My Edit") // local content untouched (invariant 2)
+        assertThat(note.title).isEqualTo("My Edit")
 
         val conflict = db.conflictDao().getForNote("note-1")!!
         assertThat(conflict.remoteTitle).isEqualTo("Device B Title")
@@ -130,7 +115,7 @@ class SyncEngineTest {
         val conflict = repository.observeConflict("note-1").first()!!
 
         assertThat(conflict.localTitle).isEqualTo("My Edit")
-        assertThat(conflict.baseTitle).isNull() // no owned backend history to reconstruct a base from
+        assertThat(conflict.baseTitle).isNull()
         assertThat(conflict.remoteTitle).isEqualTo("Device B Title")
 
         repository.resolveConflict("note-1", "Merged", "Merged body")
@@ -142,10 +127,8 @@ class SyncEngineTest {
         repository.saveNote("note-1", "T1", "B1")
         engine.sync()
 
-        repository.saveNote("note-1", "Local In Progress", "Local In Progress Body") // fresh PENDING op
+        repository.saveNote("note-1", "Local In Progress", "Local In Progress Body")
 
-        // Isolates the pull-side skip rule directly, independent of whatever the push side of
-        // this same round would do to that PENDING op.
         val remoteChange = RemoteNote("note-1", version = "99", deleted = false, title = "Remote Title", body = "Remote Body")
         repository.applyDelta(listOf(remoteChange).map { it.toRemoteNoteChange() }, newSyncToken = "99")
 
@@ -180,7 +163,7 @@ class SyncEngineTest {
         val outcome = engine.sync()
 
         assertThat(outcome).isEqualTo(SyncOutcome.TransportFailure)
-        assertThat(db.outboxDao().getPendingForNote("note-1")).isNull() // frozen (IN_FLIGHT), not PENDING
+        assertThat(db.outboxDao().getPendingForNote("note-1")).isNull()
         assertThat(db.outboxDao().countForNote("note-1")).isEqualTo(1)
 
         val recovered = engine.sync()

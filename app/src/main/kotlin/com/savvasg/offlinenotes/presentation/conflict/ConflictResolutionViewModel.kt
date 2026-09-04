@@ -17,15 +17,10 @@ import kotlinx.coroutines.launch
 
 data class ConflictResolutionUiState(
     val conflict: NoteConflict? = null,
-    /** What the resolution fields show. Falls back to the local side until the user edits. */
     val draftTitle: String = "",
     val draftBody: String = "",
 )
 
-/**
- * "Keep mine", "keep theirs" and manual editing all funnel through one draft — the quick actions
- * just overwrite it — so [resolve] does the same thing regardless of how the user got there.
- */
 @HiltViewModel
 class ConflictResolutionViewModel @Inject constructor(
     private val repository: NoteRepository,

@@ -21,13 +21,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/**
- * Regression test for [NoteEditorViewModel.flush] being wired to both ON_STOP and onDispose: before
- * the fix, the second call re-ran the write on unchanged content and reset syncState to PENDING,
- * clobbering a CONFLICT the first call's sync had already staged.
- */
 @OptIn(ExperimentalCoroutinesApi::class)
-@RunWith(RobolectricTestRunner::class) // SavedStateHandle(route = ...) encodes via android.net.Uri
+@RunWith(RobolectricTestRunner::class)
 class NoteEditorViewModelTest {
 
     private val repository = mockk<NoteRepository>(relaxed = true)
@@ -52,8 +47,8 @@ class NoteEditorViewModelTest {
         viewModel.onTitleChange("Title")
         viewModel.onBodyChange("Body")
 
-        viewModel.flush() // e.g. ON_STOP
-        viewModel.flush() // e.g. onDispose, firing right after
+        viewModel.flush()
+        viewModel.flush()
 
         coVerify(exactly = 1) { repository.saveNote("note-1", "Title", "Body") }
     }

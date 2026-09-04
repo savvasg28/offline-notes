@@ -29,8 +29,6 @@ class OfflineNotesApplication : Application(), Configuration.Provider {
 
         syncScheduler.schedulePeriodicBackstop()
 
-        // ProcessLifecycleOwner's ON_START fires once per foreground entry rather than per Activity,
-        // so returning from the background triggers exactly one sync instead of one per screen.
         ProcessLifecycleOwner.get().lifecycle.addObserver(
             object : DefaultLifecycleObserver {
                 override fun onStart(owner: LifecycleOwner) {

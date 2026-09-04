@@ -13,11 +13,6 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import retrofit2.Response
 
-/**
- * Maps HTTP status codes onto the same exception types the local stub throws, so
- * [com.savvasg.offlinenotes.sync.SyncEngine] handles a transport failure identically whichever
- * [SyncTransport] backs it.
- */
 @Singleton
 class HttpTransport @Inject constructor(private val api: OfflineNotesApi) : SyncTransport {
 

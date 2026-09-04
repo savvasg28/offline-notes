@@ -5,10 +5,6 @@ import com.savvasg.offlinenotes.domain.model.NoteConflict
 import com.savvasg.offlinenotes.domain.model.NoteListItem
 import kotlinx.coroutines.flow.Flow
 
-/**
- * Writes here are intents: [saveNote] always goes through the outbox and never touches
- * `serverVersion`. The sync engine must not call these — see [NoteSyncOperations].
- */
 interface NoteRepository {
     fun observeNotes(): Flow<List<NoteListItem>>
     fun observeNote(id: String): Flow<Note?>

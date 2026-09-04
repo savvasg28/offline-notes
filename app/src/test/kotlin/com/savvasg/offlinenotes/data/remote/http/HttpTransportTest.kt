@@ -20,11 +20,6 @@ import org.junit.Test
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 
-/**
- * Covers serialization and status-code mapping. Retry and backoff are not HttpTransport's job — a
- * transport failure just throws, and WorkManager's own retry policy (wired in SyncWorker) does the
- * rest.
- */
 class HttpTransportTest {
 
     private lateinit var server: MockWebServer
@@ -44,12 +39,9 @@ class HttpTransportTest {
 
     @After
     fun tearDown() {
-        // The dropped-connection test shuts the server down itself to force a socket-level
-        // failure; shutting an already-shut-down MockWebServer down again throws.
         try {
             server.shutdown()
         } catch (ignored: Exception) {
-            // already shut down by the test
         }
     }
 
@@ -95,7 +87,6 @@ class HttpTransportTest {
             transport.pushOps(listOf(createOp()))
             throw AssertionError("expected AuthFailureException")
         } catch (expected: AuthFailureException) {
-            // expected
         }
     }
 
@@ -106,7 +97,6 @@ class HttpTransportTest {
             transport.pushOps(listOf(createOp()))
             throw AssertionError("expected RateLimitException")
         } catch (expected: RateLimitException) {
-            // expected
         }
     }
 
@@ -117,7 +107,6 @@ class HttpTransportTest {
             transport.pullDelta(since = "1")
             throw AssertionError("expected SyncTokenExpiredException")
         } catch (expected: SyncTokenExpiredException) {
-            // expected
         }
     }
 
@@ -128,18 +117,16 @@ class HttpTransportTest {
             transport.pushOps(listOf(createOp()))
             throw AssertionError("expected NetworkException")
         } catch (expected: NetworkException) {
-            // expected
         }
     }
 
     @Test
     fun `a dropped connection maps to NetworkException rather than an unhandled IOException`() = runTest {
-        server.shutdown() // nothing listening -> the request fails at the socket level
+        server.shutdown()
         try {
             transport.pushOps(listOf(createOp()))
             throw AssertionError("expected NetworkException")
         } catch (expected: NetworkException) {
-            // expected
         }
     }
 }

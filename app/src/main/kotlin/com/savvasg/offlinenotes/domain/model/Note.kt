@@ -10,7 +10,6 @@ data class Note(
     val lastUpdated: Long,
 )
 
-/** List-row projection: the list screen never observes full bodies. */
 data class NoteListItem(
     val id: String,
     val title: String,

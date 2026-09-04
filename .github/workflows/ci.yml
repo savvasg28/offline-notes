@@ -50,8 +50,6 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      # Covers what unit tests structurally can't (§11): FTS5 DAO queries — Robolectric's
-      # bundled SQLite lacks the extension real devices have (see FTS_CALLBACK's kdoc).
       - name: Run instrumented tests
         uses: reactivecircus/android-emulator-runner@v2
         with:

@@ -4,11 +4,9 @@ import kotlinx.serialization.Serializable
 
 enum class SyncState { SYNCED, PENDING, CONFLICT }
 
-/** Decided by whether the note has a `serverVersion` yet, never by edit count. */
 @Serializable
 enum class OpType { CREATE, UPDATE, DELETE }
 
-/** `baseVersion` is resolved at the freeze point, not when the op was created. */
 data class FrozenOutboxOp(
     val opId: String,
     val noteId: String,
@@ -18,7 +16,6 @@ data class FrozenOutboxOp(
     val body: String?,
 )
 
-/** Base and remote sides of a conflict; local is the `notes` row itself, so it is not copied here. */
 data class ConflictPayload(
     val baseVersion: String?,
     val baseTitle: String?,

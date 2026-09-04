@@ -19,8 +19,9 @@ npx @mockoon/cli start --data mockoon/offline-notes.json --port 8080
 
 **Desktop app:** File → Open environment → select `offline-notes.json`, then press ▶.
 
-Either way, point the app's debug panel ("Use HTTP transport" → base URL) at
-`http://10.0.2.2:8080/` from an emulator, or your machine's LAN IP from a physical device.
+The debug build already points at `http://10.0.2.2:8080/` (the emulator's alias for the host)
+through `BuildConfig.API_BASE_URL`. For a physical device, change that value in
+`app/build.gradle.kts` to your machine's LAN IP.
 
 ## Scripting a scenario
 
@@ -28,4 +29,4 @@ Each route has multiple example responses (Applied / Conflict / Rejected / 401 /
 only one enabled (`"default": true`) at a time. In the desktop app, click a response to make it
 active, or add your own [response rules](https://mockoon.com/docs/latest/rules/overview/) keyed
 off the request body (e.g. match on `noteId` to conflict one specific note and apply everything
-else) — this is the Mockoon-side equivalent of the old debug panel's per-note failure injection.
+else) — this is where per-note failure injection lives now that the app ships no debug tooling.

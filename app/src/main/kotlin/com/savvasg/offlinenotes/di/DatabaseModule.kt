@@ -24,7 +24,6 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): OfflineNotesDatabase =
         Room.databaseBuilder(context, OfflineNotesDatabase::class.java, OfflineNotesDatabase.DB_NAME)
-            // Bundled rather than platform SQLite: FTS5 is not guaranteed on the OS-provided one.
             .setDriver(BundledSQLiteDriver())
             .setQueryCoroutineContext(Dispatchers.IO)
             .addCallback(OfflineNotesDatabase.SCHEMA_CALLBACK)

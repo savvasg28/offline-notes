@@ -28,10 +28,6 @@ class NoteTransactionsTest {
     @Before
     fun setUp() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        // No .setDriver(...) here: BundledSQLiteDriver ships an Android-native binary that can't
-        // load under Robolectric's host JVM. Falls back to Robolectric's own shadowed SQLite,
-        // which lacks FTS5 — see OfflineNotesDatabase.FTS_CALLBACK's kdoc — so only the schema
-        // callback (partial unique index) is applied; FTS5 is covered by an instrumented test.
         db = Room.inMemoryDatabaseBuilder(context, OfflineNotesDatabase::class.java)
             .addCallback(OfflineNotesDatabase.SCHEMA_CALLBACK)
             .allowMainThreadQueries()
@@ -80,9 +76,6 @@ class NoteTransactionsTest {
     fun `partial unique index rejects a second PENDING op for the same note at the schema level`() = runTest {
         transactions.writeTxn("note-1", "T1", "B1", now = 1000)
 
-        // A raw INSERT (bypassing NoteTransactions, and Room's @Upsert — which resolves conflicts
-        // via INSERT OR IGNORE and would silently no-op instead of surfacing them) proves the
-        // constraint lives in the schema itself, not just in NoteTransactions' own bookkeeping.
         try {
             db.useWriterConnection { connection ->
                 connection.execSQL(
@@ -94,7 +87,6 @@ class NoteTransactionsTest {
             }
             throw AssertionError("expected SQLiteException")
         } catch (expected: SQLiteException) {
-            // idx_outbox_one_pending fired.
         }
     }
 
@@ -132,13 +124,10 @@ class NoteTransactionsTest {
         val frozenFirst = transactions.freezeTxn()
         assertThat(frozenFirst.single().baseVersion).isEqualTo("v1")
 
-        // A second edit arrives while the first op is IN_FLIGHT.
         transactions.writeTxn("note-1", "T3", "B3", now = 3000)
 
-        // The in-flight op acks, bumping serverVersion to v2.
         transactions.applyAppliedTxn(frozenFirst.single().opId, newVersion = "v2")
 
-        // The second op was created back when serverVersion was still v1 — it must ship v2.
         val frozenSecond = transactions.freezeTxn()
         assertThat(frozenSecond).hasSize(1)
         assertThat(frozenSecond.single().baseVersion).isEqualTo("v2")
@@ -150,7 +139,6 @@ class NoteTransactionsTest {
         val frozen = transactions.freezeTxn()
         val opId = frozen.single().opId
 
-        // The user keeps typing after the freeze; this lands in a brand-new PENDING op.
         transactions.writeTxn("note-1", "T2-live-edit", "B2-live-edit", now = 1500)
 
         transactions.applyAppliedTxn(opId, newVersion = "v1")
@@ -341,7 +329,7 @@ class NoteTransactionsTest {
         )
 
         val note = db.noteDao().getNote("note-1")!!
-        assertThat(note.title).isEqualTo("Local Title") // untouched
+        assertThat(note.title).isEqualTo("Local Title")
 
         val conflict = db.conflictDao().getForNote("note-1")!!
         assertThat(conflict.remoteVersion).isEqualTo("v2")
@@ -373,17 +361,12 @@ class NoteTransactionsTest {
 
     @Test
     fun `expired_token_triggers_rebootstrap - local-only notes survive, previously-synced-and-now-absent notes are purged`() = runTest {
-        // A previously-synced note the bootstrap snapshot no longer contains (deleted server-side
-        // while this client was offline).
         transactions.writeTxn("gone-remotely", "T1", "B1", now = 1000)
         val goneOpId = db.outboxDao().getPendingForNote("gone-remotely")!!.opId
         transactions.applyAppliedTxn(goneOpId, newVersion = "1")
 
-        // A brand-new local note never yet synced (serverVersion == null), with its CREATE op
-        // still PENDING — exactly the state a real client is in mid-edit.
         transactions.writeTxn("local-only", "T2", "B2", now = 2000)
 
-        // Bootstrap snapshot contains neither note.
         transactions.applyBootstrapTxn(remoteNotes = emptyList(), newSyncToken = "boot-1", now = 3000)
 
         assertThat(db.noteDao().getNote("gone-remotely")).isNull()
@@ -399,7 +382,6 @@ class NoteTransactionsTest {
         transactions.writeTxn("note-1", "T1", "B1", now = 1000)
         val opId = db.outboxDao().getPendingForNote("note-1")!!.opId
         transactions.applyAppliedTxn(opId, newVersion = "1")
-        // A second edit is in flight when the bootstrap runs.
         transactions.writeTxn("note-1", "T2", "B2", now = 2000)
         transactions.freezeTxn()
 

@@ -36,14 +36,9 @@ interface NoteDao {
     @Query("UPDATE notes SET isDeleted = :isDeleted, lastUpdated = :now WHERE id = :id")
     suspend fun updateIsDeleted(id: String, isDeleted: Boolean, now: Long)
 
-    /** Only safe once no outbox row references the note (the FK is ON DELETE RESTRICT). */
     @Query("DELETE FROM notes WHERE id = :id")
     suspend fun purge(id: String)
 
-    // FTS5 has no Room annotation, so Room can neither verify this SQL nor discover notes_fts for
-    // Flow invalidation — hence @RawQuery with the observed table declared explicitly. notes_fts only
-    // changes as a trigger side effect of `notes` changing in the same transaction, so observing
-    // NoteEntity is sufficient.
     @RawQuery(observedEntities = [NoteEntity::class])
     fun searchActiveNotesRaw(query: RoomRawQuery): Flow<List<NoteEntity>>
 }

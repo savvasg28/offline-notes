@@ -9,7 +9,6 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Query
 
-/** The wire contract over HTTP. Raw [Response] so [HttpTransport] can map status codes itself. */
 interface OfflineNotesApi {
     @POST("push")
     suspend fun pushOps(@Body ops: List<OutgoingOp>): Response<List<OpResult>>

@@ -5,10 +5,6 @@ import com.savvasg.offlinenotes.domain.model.OpType
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/**
- * The wire contract [SyncTransport] implementations speak. This repo is a client against that
- * contract; nothing here implements the server side of it.
- */
 @Serializable
 data class OutgoingOp(
     val opId: String,
@@ -19,11 +15,6 @@ data class OutgoingOp(
     val body: String?,
 )
 
-/**
- * `@SerialName` pins each variant's wire discriminator to a short, stable string. Without it
- * kotlinx.serialization defaults to the fully-qualified Kotlin class name, which would leak package
- * structure into the wire format and break the moment a class is renamed or moved.
- */
 @Serializable
 sealed interface OpResult {
     val opId: String
@@ -65,10 +56,8 @@ data class DeltaPage(
     val hasMore: Boolean,
 )
 
-/** The cursor no longer reaches far enough back into history; the client re-bootstraps. */
 class SyncTokenExpiredException : Exception("sync token expired; client must clear it and re-bootstrap")
 
-/** Transport-level failures: retry the whole batch with the same opIds. */
 sealed class TransportException(message: String) : Exception(message)
 class AuthFailureException : TransportException("auth failure")
 class RateLimitException : TransportException("rate limited")

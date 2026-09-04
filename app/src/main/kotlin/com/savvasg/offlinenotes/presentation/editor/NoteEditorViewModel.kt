@@ -21,18 +21,9 @@ import kotlinx.coroutines.launch
 data class NoteEditorUiState(
     val title: String = "",
     val body: String = "",
-    /** Null until the note exists on disk; a note that was never created can't be in conflict. */
     val syncState: SyncState? = null,
 )
 
-/**
- * No save button: autosave is debounced on a typing pause, and [flush] persists immediately for
- * editor close / app background, which also triggers an expedited sync.
- *
- * Persistence runs in `NonCancellable`: without it a save launched as the screen is popped can be
- * cancelled when the NavBackStackEntry's ViewModelStore clears viewModelScope — precisely the
- * moment [flush] exists to protect against.
- */
 @HiltViewModel
 class NoteEditorViewModel @Inject constructor(
     private val repository: NoteRepository,
@@ -55,7 +46,6 @@ class NoteEditorViewModel @Inject constructor(
                 if (note == null) return@collect
                 hasPersistedOnce = true
                 mutableUiState.update { current ->
-                    // Once the user has typed, a remote update must not overwrite what's on screen.
                     if (hasUserEdited) {
                         current.copy(syncState = note.syncState)
                     } else {
@@ -81,12 +71,6 @@ class NoteEditorViewModel @Inject constructor(
         edits.tryEmit(Unit)
     }
 
-    /**
-     * Idempotent per edit session, deliberately: NoteEditorScreen wires this to both ON_STOP and
-     * onDispose, which can both fire for a single navigation away. Without clearing [hasUserEdited]
-     * the second call re-runs the write on unchanged content, resetting syncState to PENDING and
-     * clobbering a CONFLICT the first call's sync had already staged.
-     */
     fun flush() {
         if (!hasUserEdited) return
         persist(alsoSync = true)
@@ -94,8 +78,6 @@ class NoteEditorViewModel @Inject constructor(
 
     private fun persist(alsoSync: Boolean = false) {
         val state = mutableUiState.value
-        // Don't create a ghost note when the user opened the editor and typed nothing. Once the
-        // note exists, always persist — including edits back down to blank.
         if (!hasPersistedOnce && state.title.isBlank() && state.body.isBlank()) return
         hasPersistedOnce = true
         hasUserEdited = false

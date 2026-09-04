@@ -23,11 +23,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 
-/**
- * One implementation behind both repository interfaces: splitting the interfaces rather than the
- * implementation lets both sides share the same DAOs and [NoteTransactions] while neither can
- * accidentally call into the other's intent.
- */
 @Singleton
 class NoteRepositoryImpl @Inject constructor(
     private val noteDao: NoteDao,
@@ -129,11 +124,6 @@ private fun NoteEntity.toListItem() = NoteListItem(
     syncState = syncState,
 )
 
-/**
- * Quotes each token (escaping embedded quotes) so FTS5 operators typed into the search box cannot
- * leak through as query syntax, then suffixes `*` for prefix matching. Null for blank input, which
- * means "no filter" rather than an invalid empty MATCH.
- */
 internal fun buildFtsMatchQuery(raw: String): String? {
     val tokens = raw.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
     if (tokens.isEmpty()) return null

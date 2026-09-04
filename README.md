@@ -42,8 +42,7 @@ flowchart LR
         Engine["SyncEngine"] -- "drains" --> Repo
         Work["WorkManager\n(SyncScheduler / SyncWorker)"] --> Engine
         Engine --> Transport["SyncTransport"]
-        Transport --> Fake["FakeTransport\n(default, scriptable stub)"]
-        Transport --> Http["HttpTransport\n(demo toggle)"]
+        Transport --> Http["HttpTransport"]
     end
     Http -. "real HTTP" .-> Backend["Mockoon\n(or any real server)"]
 ```
@@ -57,10 +56,8 @@ a correct client of a wire contract — specified in [`openapi/offline-notes.yam
 and typed in [`data/remote/dto/RemoteDtos.kt`](app/src/main/kotlin/com/savvasg/offlinenotes/data/remote/dto/RemoteDtos.kt) —
 and whatever answers on the other end of `HttpTransport` — a real backend, or the
 [Mockoon environment](mockoon/) checked in here — is out of scope for what this repo
-demonstrates. `FakeTransport`, the zero-setup default, is a stateless scriptable stub for the
-same reason: it returns `Applied` by default and lets the debug panel queue one-shot overrides
-(`Conflict`, `Rejected`, dropped response, expired token, ...), but it has no CAS, no
-persistence, no dedupe — those would be backend logic.
+demonstrates. The app ships exactly one transport, `HttpTransport`; the base URL comes from a
+per-build-type `BuildConfig.API_BASE_URL`, so there is nothing to switch at runtime.
 
 **One repository implementation behind two interfaces.** `NoteRepository` is UI-facing
 (`observeNotes`, `saveNote`, `resolveConflict`, ...); `NoteSyncOperations` is sync-facing
@@ -138,37 +135,27 @@ correctness.
 
 ## Run the hard cases yourself
 
-**Debug panel** (bug icon, top-right of the notes list) exposes `FakeTransport`'s failure-injection
-switches as a single tap: latency, forced conflict, forced rejection, dropped response, expired
-sync token, rate limit, auth failure. Tap "Force conflict (next push)" on a synced note, edit that
-note locally, and watch the conflict banner appear on the very next sync.
-
-**Against a real (mocked) server.** `FakeTransport` is single-process and stateless, so it can't
-show two *separate* app instances converging on shared state. To see that, point `HttpTransport`
-at a real server instead — [`mockoon/offline-notes.json`](mockoon/) is a starter environment
-implementing the wire contract:
+The failure paths are driven from the server side, by whatever `HttpTransport` is pointed at.
+[`mockoon/offline-notes.json`](mockoon/) is a starter environment implementing the wire contract:
 
 ```bash
 npx @mockoon/cli start --data mockoon/offline-notes.json --port 8080
 ```
 
-Then, in the debug panel, turn on **"Use HTTP transport"** and set the base URL:
+The debug build points at `http://10.0.2.2:8080/` (the emulator's alias for the host) via
+`BuildConfig.API_BASE_URL`; change that value in `app/build.gradle.kts` to target a physical
+device at the host's LAN IP, or a real backend.
 
-- Emulator → host: `http://10.0.2.2:8080/` (pre-filled by default)
-- Physical device → host: `http://<your-machine's-LAN-IP>:8080/`
-
-Run two app instances (two emulators, or an emulator + a physical device) against the same
-Mockoon instance, edit the same note from both, and enable the Conflict response in Mockoon (or
-add a rule) to see a real cross-device conflict resolved through the same screen the debug panel's
-`FakeTransport` version uses — the client-side conflict handling is identical either way, since
-`SyncEngine` never knows which `SyncTransport` it's talking to.
+Enable Mockoon's Conflict response for `POST /push` (or add a rule keyed on `noteId`), edit that
+note locally, and the conflict banner appears on the next sync. Run two app instances against the
+same Mockoon instance to watch two devices converge on shared state.
 
 **Scenario tests** (see below) exercise every one of these paths without a UI at all.
 
 ## Testing
 
 ```bash
-./gradlew :app:testDebugUnitTest      # 45 tests
+./gradlew :app:testDebugUnitTest      # 48 tests
 ./gradlew :app:connectedDebugAndroidTest  # 4 tests, needs a device/emulator
 ```
 
@@ -198,7 +185,7 @@ and `BuildFtsMatchQueryTest` (6 tests: the FTS5 query-injection-safe prefix-matc
 Since this repo doesn't own backend semantics, `crash_between_send_and_ack_replays_safely` and
 `resolution_supersedes_parked_op` assert what's actually the *client's* responsibility — sending
 the identical `opId`/op on retry — rather than a specific server-side dedupe outcome, which would
-require `FakeTransport` to fake real backend state.
+require the test double to fake real backend state.
 
 ## Rejected alternatives
 
@@ -218,12 +205,12 @@ absorbed by the conflict machinery, not by correctness. Adding a push trigger la
 
 **Owning a reference backend (`server-core` + a Ktor `:server` module).** An earlier version of
 this repo did exactly that — a plain-Kotlin state machine (CAS, opId dedupe, a change log) shared
-in-process by `FakeTransport` and wrapped in Ktor routes for a real-HTTP demo. Cut because it's
+in-process by the fake transport and wrapped in Ktor routes for a real-HTTP demo. Cut because it's
 scope creep for what this repo is actually meant to demonstrate: an offline-first *client*. Real
 products don't get to invent their own backend semantics to match their client's convenience —
 the client has to be correct against whatever contract the backend team actually ships, which is
 exactly what `HttpTransport` + a Mockoon-mocked (or genuinely real) server represents. The cost:
-`FakeTransport` can no longer fake real CAS/conflict detection on its own, so scenario tests now
+the test double can no longer fake real CAS/conflict detection on its own, so scenario tests now
 script the exact response each case needs (`forceConflictOnNextPush`, `queueNextPullPage`)
 instead of driving real server-side state — arguably a clearer signal of what's actually being
 tested, since the assertion is about the client's reaction, not about a fake server's fidelity.
@@ -249,9 +236,8 @@ in the design above where it would attach.
 
 **App:** Kotlin 2.2, Compose, Material 3, Room 2.8 (BundledSQLiteDriver — see below), WorkManager,
 Hilt, Coroutines/Flow, Retrofit/OkHttp + kotlinx-serialization.
-**Mock backend:** [Mockoon](mockoon/) (static/rule-based HTTP mocks) for the real-HTTP demo path;
-a scriptable stub (`FakeTransport`) for the zero-setup default. The contract both answer to is
-specified in [`openapi/offline-notes.yaml`](openapi/offline-notes.yaml).
+**Mock backend:** [Mockoon](mockoon/) (static/rule-based HTTP mocks). The contract it answers to
+is specified in [`openapi/offline-notes.yaml`](openapi/offline-notes.yaml).
 **Test:** JUnit, Robolectric, AndroidX Test, Turbine-compatible coroutines-test, MockWebServer,
 `WorkManagerTestInitHelper`, MockK, Truth.
 

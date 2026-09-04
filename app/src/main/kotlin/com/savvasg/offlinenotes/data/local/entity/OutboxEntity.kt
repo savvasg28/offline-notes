@@ -7,15 +7,6 @@ import androidx.room.PrimaryKey
 import com.savvasg.offlinenotes.data.local.database.OfflineNotesDatabase
 import com.savvasg.offlinenotes.domain.model.OpType
 
-/**
- * `baseVersion` is deliberately NOT a column: it is resolved from [NoteEntity.serverVersion] at
- * freeze time rather than stamped at op creation. Storing it early would ship a stale base once a
- * prior op's ack bumped the version, producing a phantom self-conflict.
- *
- * The partial unique index that allows at most one PENDING op per note is created in raw SQL by
- * [OfflineNotesDatabase]. IN_FLIGHT and PARKED rows are exempt by construction: an edit arriving
- * while an op is in flight legitimately creates a second row.
- */
 @Entity(
     tableName = "outbox",
     foreignKeys = [

@@ -23,7 +23,6 @@ class BuildFtsMatchQueryTest {
 
     @Test
     fun `FTS5 syntax characters in user input are neutralized by quoting`() {
-        // Without quoting, `AND`, `OR`, `-`, `:` etc. are FTS5 query operators.
         assertThat(buildFtsMatchQuery("milk OR eggs")).isEqualTo("\"milk\"* \"OR\"* \"eggs\"*")
         assertThat(buildFtsMatchQuery("col:value")).isEqualTo("\"col:value\"*")
     }

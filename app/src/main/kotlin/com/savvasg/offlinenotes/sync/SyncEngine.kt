@@ -11,17 +11,8 @@ import javax.inject.Inject
 sealed interface SyncOutcome {
     data object Done : SyncOutcome
 
-    /**
-     * PENDING ops survived a full round, which can only be live-editing residue: one freeze grabs
-     * every currently-PENDING op atomically, so nothing can predate it and survive a successful
-     * push+apply. The caller re-enqueues with a delay so a continuously-typing user is not hammered.
-     */
     data object PendingResidue : SyncOutcome
 
-    /**
-     * Push failed at the transport level, so the whole batch is retried with the same opIds. The ops
-     * stay IN_FLIGHT; the next run's [NoteSyncOperations.resetStaleInFlight] frees them for re-freezing.
-     */
     data object TransportFailure : SyncOutcome
 }
 
@@ -57,10 +48,6 @@ class SyncEngine @Inject constructor(
         }
     }
 
-    /**
-     * Push before pull, deliberately: draining first shrinks the set of notes the pull has to skip,
-     * and routes conflicts through the push response, the only path that carries base content.
-     */
     private suspend fun pullDelta() {
         var since = syncOperations.currentSyncToken()
         while (true) {
@@ -76,11 +63,10 @@ class SyncEngine @Inject constructor(
         }
     }
 
-    /** Token expired: drop the cursor and re-apply a full current-state snapshot. */
     private suspend fun bootstrap() {
         var since: String? = null
         while (true) {
-            val page = transport.pullDelta(since) // null (bootstrap) never itself expires
+            val page = transport.pullDelta(since)
             syncOperations.applyBootstrap(page.notes.map { it.toRemoteNoteChange() }, page.nextSyncToken)
             if (!page.hasMore) return
             since = page.nextSyncToken
