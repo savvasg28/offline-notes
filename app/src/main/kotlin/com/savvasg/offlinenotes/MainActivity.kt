@@ -11,12 +11,12 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.savvasg.offlinenotes.presentation.conflict.ConflictResolutionScreen
-import com.savvasg.offlinenotes.presentation.conflict.ConflictRoute
-import com.savvasg.offlinenotes.presentation.editor.EditorRoute
-import com.savvasg.offlinenotes.presentation.editor.NoteEditorScreen
-import com.savvasg.offlinenotes.presentation.notelist.NotesListRoute
-import com.savvasg.offlinenotes.presentation.notelist.NotesListScreen
+import com.savvasg.offlinenotes.feature.conflict.ConflictResolutionScreen
+import com.savvasg.offlinenotes.feature.conflict.ConflictRoute
+import com.savvasg.offlinenotes.feature.editor.EditorRoute
+import com.savvasg.offlinenotes.feature.editor.NoteEditorScreen
+import com.savvasg.offlinenotes.feature.notelist.NotesListRoute
+import com.savvasg.offlinenotes.feature.notelist.NotesListScreen
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint

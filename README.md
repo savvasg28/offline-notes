@@ -47,13 +47,49 @@ flowchart LR
     Http -. "real HTTP" .-> Backend["Mockoon\n(or any real server)"]
 ```
 
-Layers: `presentation` → `domain` (repository interfaces, models) → `data` (Room + repository
-impl). `sync` is a peer of `data`, not a child of it — the engine and the UI both sit on top of
-the repository, neither on top of the other.
+### Module graph
+
+```mermaid
+flowchart TD
+    app[":app"]
+    fnl[":feature:notelist"]
+    fed[":feature:editor"]
+    fco[":feature:conflict"]
+    cui[":core:ui"]
+    cdata[":core:data"]
+    csync[":core:sync"]
+    cdb[":core:database"]
+    cnet[":core:network"]
+    cdom[":core:domain"]
+    cmodel[":core:model"]
+
+    app --> fnl & fed & fco
+    fnl --> cdom & cui
+    fed --> cdom & cui & csync
+    fco --> cdom & cui
+    app --> cdata & csync & cdb & cnet
+    cdata --> cdb & csync & cdom
+    csync --> cnet & cdom
+    cdb --> cmodel
+    cnet --> cmodel
+    cdom --> cmodel
+```
+
+Each arrow is `implementation`, not `api` — a module sees only what it directly declares, not
+what its dependencies depend on. `:core:model` and `:core:domain` are plain Kotlin/JVM modules
+with no Android dependency at all: `:core:domain`'s two repository interfaces
+(`NoteRepository`, `NoteSyncOperations`) are the seam invariant 2 is built on (below), and they
+can't smuggle in an Android or Room dependency by accident because the module they live in
+can't see either.
+
+`:core:sync` depends on `:core:domain` and `:core:network`, never on `:core:data` — the module
+that implements `NoteSyncOperations` and calls `SyncScheduler` is downstream of the sync engine,
+not upstream of it, so that dependency edge runs the other way, from `:core:data` to `:core:sync`.
+Reversing it would be a real cycle, not just a style violation; Gradle would refuse to build it.
 
 **This repo owns the client only.** There's no owned reference server implementation: the app is
 a correct client of a wire contract — specified in [`openapi/offline-notes.yaml`](openapi/offline-notes.yaml)
-and typed in [`data/remote/dto/RemoteDtos.kt`](app/src/main/kotlin/com/savvasg/offlinenotes/data/remote/dto/RemoteDtos.kt) —
+and typed in [`RemoteDtos.kt`](core/network/src/main/kotlin/com/savvasg/offlinenotes/core/network/dto/RemoteDtos.kt) —
 and whatever answers on the other end of `HttpTransport` — a real backend, or the
 [Mockoon environment](mockoon/) checked in here — is out of scope for what this repo
 demonstrates. The app ships exactly one transport, `HttpTransport`; the base URL comes from a
@@ -124,7 +160,7 @@ is an ordinary `UPDATE` op with the same idempotency and CAS as any other write.
 | Periodic | Long-interval backstop only (≥ 6h). |
 
 **W is the bounded data-loss window** — the maximum span of typing that exists on one device
-only — named as such in [`SyncScheduler`](app/src/main/kotlin/com/savvasg/offlinenotes/sync/SyncScheduler.kt).
+only — named as such in [`SyncScheduler`](core/sync/src/main/kotlin/com/savvasg/offlinenotes/core/sync/SyncScheduler.kt).
 It's delay-*from-first-edit*, not debounce-from-last: a debounce never fires during continuous
 typing, so staleness would grow unbounded exactly when the user is producing the most unsynced
 work.
@@ -155,9 +191,13 @@ same Mockoon instance to watch two devices converge on shared state.
 ## Testing
 
 ```bash
-./gradlew :app:testDebugUnitTest      # 48 tests
-./gradlew :app:connectedDebugAndroidTest  # 4 tests, needs a device/emulator
+./gradlew testDebugUnitTest         # 48 tests, across every module that has any
+./gradlew connectedDebugAndroidTest # 4 tests (:core:database), needs a device/emulator
 ```
+
+Unqualified: unit tests live wherever the thing they test lives (`:core:database`,
+`:core:network`, `:core:sync`, `:core:data`, `:feature:editor`), not all in `:app`, and an
+unqualified Gradle task name runs in every module that declares it.
 
 CI (`.github/workflows/ci.yml`) runs both on every push: a plain JVM job for the unit tests, and a
 `reactivecircus/android-emulator-runner` job for the instrumented ones.

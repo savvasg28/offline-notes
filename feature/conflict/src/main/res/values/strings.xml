@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="conflict_title">Resolve conflict</string>
+    <string name="conflict_none">No conflict to resolve.</string>
+    <string name="conflict_explanation">This note changed on another device while you had local edits pending. Compare the three versions below, then keep one side or edit the result manually.</string>
+    <string name="conflict_version_local">Local (yours)</string>
+    <string name="conflict_version_base">Base (common ancestor)</string>
+    <string name="conflict_version_remote">Remote (other device)</string>
+    <string name="conflict_no_base">No common history available — showing local vs. remote only.</string>
+    <string name="conflict_resolution_heading">Resolution</string>
+    <string name="conflict_keep_mine">Keep mine</string>
+    <string name="conflict_keep_theirs">Keep theirs</string>
+</resources>
