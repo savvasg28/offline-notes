@@ -15,7 +15,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
@@ -47,7 +46,6 @@ import java.util.Date
 fun NotesListScreen(
     onNoteClick: (String) -> Unit,
     onNewNote: (String) -> Unit,
-    onOpenDebugPanel: (() -> Unit)?,
     viewModel: NotesListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -58,7 +56,6 @@ fun NotesListScreen(
         onNoteClick = onNoteClick,
         onDeleteNote = viewModel::onDeleteNote,
         onNewNote = { onNewNote(viewModel.newNoteId()) },
-        onOpenDebugPanel = onOpenDebugPanel,
     )
 }
 
@@ -70,7 +67,6 @@ fun NotesListContent(
     onNoteClick: (String) -> Unit,
     onDeleteNote: (String) -> Unit,
     onNewNote: () -> Unit,
-    onOpenDebugPanel: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -78,14 +74,6 @@ fun NotesListContent(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.notes_list_title)) },
-                actions = {
-                    // Absent in release builds, where the debug panel isn't compiled in at all.
-                    if (onOpenDebugPanel != null) {
-                        IconButton(onClick = onOpenDebugPanel) {
-                            Icon(Icons.Default.BugReport, contentDescription = stringResource(R.string.notes_list_open_debug_panel))
-                        }
-                    }
-                },
             )
         },
         floatingActionButton = {

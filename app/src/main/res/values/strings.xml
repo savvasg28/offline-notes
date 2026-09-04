@@ -16,7 +16,6 @@
     <string name="notes_list_no_matches">No matches</string>
     <string name="notes_list_new_note">New note</string>
     <string name="notes_list_delete_note">Delete</string>
-    <string name="notes_list_open_debug_panel">Debug panel</string>
 
     <!-- Editor -->
     <string name="editor_conflict_banner">This note changed on another device.</string>

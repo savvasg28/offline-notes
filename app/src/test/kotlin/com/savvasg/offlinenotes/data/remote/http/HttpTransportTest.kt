@@ -6,7 +6,7 @@ import com.savvasg.offlinenotes.data.remote.dto.DeltaPage
 import com.savvasg.offlinenotes.data.remote.dto.OpResult
 import com.savvasg.offlinenotes.data.remote.dto.OutgoingOp
 import com.savvasg.offlinenotes.data.remote.dto.RateLimitException
-import com.savvasg.offlinenotes.data.remote.dto.SimulatedNetworkException
+import com.savvasg.offlinenotes.data.remote.dto.NetworkException
 import com.savvasg.offlinenotes.data.remote.dto.SyncTokenExpiredException
 import com.savvasg.offlinenotes.domain.model.OpType
 import kotlinx.coroutines.test.runTest
@@ -122,23 +122,23 @@ class HttpTransportTest {
     }
 
     @Test
-    fun `500 maps to SimulatedNetworkException - a whole-batch-retry signal`() = runTest {
+    fun `500 maps to NetworkException - a whole-batch-retry signal`() = runTest {
         server.enqueue(MockResponse().setResponseCode(500))
         try {
             transport.pushOps(listOf(createOp()))
-            throw AssertionError("expected SimulatedNetworkException")
-        } catch (expected: SimulatedNetworkException) {
+            throw AssertionError("expected NetworkException")
+        } catch (expected: NetworkException) {
             // expected
         }
     }
 
     @Test
-    fun `a dropped connection maps to SimulatedNetworkException rather than an unhandled IOException`() = runTest {
+    fun `a dropped connection maps to NetworkException rather than an unhandled IOException`() = runTest {
         server.shutdown() // nothing listening -> the request fails at the socket level
         try {
             transport.pushOps(listOf(createOp()))
-            throw AssertionError("expected SimulatedNetworkException")
-        } catch (expected: SimulatedNetworkException) {
+            throw AssertionError("expected NetworkException")
+        } catch (expected: NetworkException) {
             // expected
         }
     }

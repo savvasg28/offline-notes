@@ -5,7 +5,7 @@ import com.savvasg.offlinenotes.data.remote.dto.DeltaPage
 import com.savvasg.offlinenotes.data.remote.dto.OpResult
 import com.savvasg.offlinenotes.data.remote.dto.OutgoingOp
 import com.savvasg.offlinenotes.data.remote.dto.RateLimitException
-import com.savvasg.offlinenotes.data.remote.dto.SimulatedNetworkException
+import com.savvasg.offlinenotes.data.remote.dto.NetworkException
 import com.savvasg.offlinenotes.data.remote.dto.SyncTokenExpiredException
 import com.savvasg.offlinenotes.data.remote.SyncTransport
 import java.io.IOException
@@ -30,14 +30,14 @@ class HttpTransport @Inject constructor(private val api: OfflineNotesApi) : Sync
     private suspend fun <T> runCatchingIo(call: suspend () -> Response<T>): Response<T> = try {
         call()
     } catch (e: IOException) {
-        throw SimulatedNetworkException(e.message ?: "network error")
+        throw NetworkException(e.message ?: "network error")
     }
 
     private fun <T> unwrap(response: Response<T>, isPull: Boolean = false): T = when (response.code()) {
-        in 200..299 -> response.body() ?: throw SimulatedNetworkException("empty ${response.raw().request.method} response")
+        in 200..299 -> response.body() ?: throw NetworkException("empty ${response.raw().request.method} response")
         401 -> throw AuthFailureException()
         429 -> throw RateLimitException()
-        410 -> if (isPull) throw SyncTokenExpiredException() else throw SimulatedNetworkException("unexpected 410")
-        else -> throw SimulatedNetworkException("server responded ${response.code()}")
+        410 -> if (isPull) throw SyncTokenExpiredException() else throw NetworkException("unexpected 410")
+        else -> throw NetworkException("server responded ${response.code()}")
     }
 }

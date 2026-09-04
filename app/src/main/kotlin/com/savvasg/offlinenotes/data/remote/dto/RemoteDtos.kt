@@ -72,4 +72,4 @@ class SyncTokenExpiredException : Exception("sync token expired; client must cle
 sealed class TransportException(message: String) : Exception(message)
 class AuthFailureException : TransportException("auth failure")
 class RateLimitException : TransportException("rate limited")
-class SimulatedNetworkException(message: String) : TransportException(message)
+class NetworkException(message: String) : TransportException(message)
