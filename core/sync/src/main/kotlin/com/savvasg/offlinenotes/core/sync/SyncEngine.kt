@@ -1,7 +1,7 @@
 package com.savvasg.offlinenotes.core.sync
 
-import com.savvasg.offlinenotes.core.domain.NoteSyncOperations
-import com.savvasg.offlinenotes.core.domain.OpAcknowledgement
+import com.savvasg.offlinenotes.core.data.NoteSyncOperations
+import com.savvasg.offlinenotes.core.data.OpAcknowledgement
 import com.savvasg.offlinenotes.core.network.dto.OpResult
 import com.savvasg.offlinenotes.core.network.dto.SyncTokenExpiredException
 import com.savvasg.offlinenotes.core.network.SyncTransport

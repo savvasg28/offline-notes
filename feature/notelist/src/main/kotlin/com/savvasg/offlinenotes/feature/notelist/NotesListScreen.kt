@@ -36,7 +36,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.savvasg.offlinenotes.core.ui.R as CoreUiR
+import com.savvasg.offlinenotes.core.designsystem.R as DesignSystemR
 import com.savvasg.offlinenotes.core.model.NoteListItem
 import com.savvasg.offlinenotes.core.model.SyncState
 import java.text.DateFormat
@@ -131,7 +131,7 @@ private fun NoteRow(note: NoteListItem, onClick: () -> Unit, onDelete: () -> Uni
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        note.title.ifBlank { stringResource(CoreUiR.string.note_untitled) },
+                        note.title.ifBlank { stringResource(DesignSystemR.string.note_untitled) },
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(end = 8.dp),
                     )

@@ -29,7 +29,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.savvasg.offlinenotes.core.ui.R as CoreUiR
+import com.savvasg.offlinenotes.core.designsystem.R as DesignSystemR
 
 @Composable
 fun ConflictResolutionScreen(
@@ -69,7 +69,7 @@ fun ConflictResolutionContent(
                 title = { Text(stringResource(R.string.conflict_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(CoreUiR.string.action_back))
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(DesignSystemR.string.action_back))
                     }
                 },
             )
@@ -122,18 +122,18 @@ fun ConflictResolutionContent(
                         value = uiState.draftTitle,
                         onValueChange = onDraftTitleChange,
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text(stringResource(CoreUiR.string.note_title_hint)) },
+                        placeholder = { Text(stringResource(DesignSystemR.string.note_title_hint)) },
                         singleLine = true,
                     )
                     TextField(
                         value = uiState.draftBody,
                         onValueChange = onDraftBodyChange,
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text(stringResource(CoreUiR.string.note_body_hint)) },
+                        placeholder = { Text(stringResource(DesignSystemR.string.note_body_hint)) },
                         minLines = 4,
                     )
                     Button(onClick = onResolve, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(CoreUiR.string.action_resolve))
+                        Text(stringResource(DesignSystemR.string.action_resolve))
                     }
                 }
             }
@@ -146,7 +146,7 @@ private fun VersionCard(label: String, title: String, body: String) {
     Card(colors = CardDefaults.cardColors()) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-            Text(title.ifBlank { stringResource(CoreUiR.string.note_untitled) }, style = MaterialTheme.typography.titleSmall)
+            Text(title.ifBlank { stringResource(DesignSystemR.string.note_untitled) }, style = MaterialTheme.typography.titleSmall)
             if (body.isNotBlank()) {
                 Text(body, style = MaterialTheme.typography.bodyMedium)
             }

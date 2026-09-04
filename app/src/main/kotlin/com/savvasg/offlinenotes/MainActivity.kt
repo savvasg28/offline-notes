@@ -4,13 +4,13 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.savvasg.offlinenotes.core.designsystem.OfflineNotesTheme
 import com.savvasg.offlinenotes.feature.conflict.ConflictResolutionScreen
 import com.savvasg.offlinenotes.feature.conflict.ConflictRoute
 import com.savvasg.offlinenotes.feature.editor.EditorRoute
@@ -24,7 +24,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
+            OfflineNotesTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     OfflineNotesRoot()
                 }

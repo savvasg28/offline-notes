@@ -40,7 +40,7 @@ flowchart LR
         UI -- "observes Flow" --> Room
         Repo --> Room
         Engine["SyncEngine"] -- "drains" --> Repo
-        Work["WorkManager\n(SyncScheduler / SyncWorker)"] --> Engine
+        Work["WorkManager\n(WorkManagerSyncTrigger / SyncWorker)"] --> Engine
         Engine --> Transport["SyncTransport"]
         Transport --> Http["HttpTransport"]
     end
@@ -55,37 +55,61 @@ flowchart TD
     fnl[":feature:notelist"]
     fed[":feature:editor"]
     fco[":feature:conflict"]
-    cui[":core:ui"]
+    cds[":core:designsystem"]
     cdata[":core:data"]
     csync[":core:sync"]
+    swork[":sync:work"]
     cdb[":core:database"]
     cnet[":core:network"]
-    cdom[":core:domain"]
+    ctest[":core:testing"]
     cmodel[":core:model"]
 
     app --> fnl & fed & fco
-    fnl --> cdom & cui
-    fed --> cdom & cui & csync
-    fco --> cdom & cui
-    app --> cdata & csync & cdb & cnet
-    cdata --> cdb & csync & cdom
-    csync --> cnet & cdom
+    app --> cdata & cdb & cnet & cds & swork
+    fnl --> cmodel & cdata & cds
+    fed --> cmodel & cdata & cds
+    fco --> cmodel & cdata & cds
+    swork --> cdata & csync
+    csync --> cmodel & cdata & cnet
+    cdata --> cmodel & cdb
     cdb --> cmodel
     cnet --> cmodel
-    cdom --> cmodel
+    ctest -.test only.-> cnet
 ```
 
 Each arrow is `implementation`, not `api` — a module sees only what it directly declares, not
-what its dependencies depend on. `:core:model` and `:core:domain` are plain Kotlin/JVM modules
-with no Android dependency at all: `:core:domain`'s two repository interfaces
-(`NoteRepository`, `NoteSyncOperations`) are the seam invariant 2 is built on (below), and they
-can't smuggle in an Android or Room dependency by accident because the module they live in
-can't see either.
+what its dependencies depend on. `:core:model` is the only module every other module can see; it's
+a plain Kotlin/JVM module with no Android dependency, so it can't smuggle one in by accident.
 
-`:core:sync` depends on `:core:domain` and `:core:network`, never on `:core:data` — the module
-that implements `NoteSyncOperations` and calls `SyncScheduler` is downstream of the sync engine,
-not upstream of it, so that dependency edge runs the other way, from `:core:data` to `:core:sync`.
-Reversing it would be a real cycle, not just a style violation; Gradle would refuse to build it.
+**No `:core:domain` module, on purpose.** An earlier version of this graph put `NoteRepository`
+and `NoteSyncOperations` in a standalone `:core:domain` module, separate from `:core:data`'s
+implementation of them. That split existed for exactly one reason: `:core:sync` needed to see
+`NoteSyncOperations` without depending on `:core:data`, because `:core:data` depended on
+`:core:sync` right back (for the WorkManager scheduler) — an actual cycle if both interface and
+impl lived together. Once the WorkManager trigger moved out into its own module (`:sync:work`,
+below), that reverse edge disappeared, and with it the only reason `:core:domain` existed. This
+app has no use cases, no logic that composes multiple repositories — just one repository behind
+two interfaces — so a "domain layer" module was never earning its name; it's gone, and
+`NoteRepository`/`NoteSyncOperations` now live directly in `:core:data`, next to the one class
+that implements both.
+
+**The sync engine and its trigger are two different modules for one reason: WorkManager.**
+`:core:sync` (`SyncEngine`, the freeze→push→apply→pull orchestration) depends only on
+`:core:data` and `:core:network` — no Android framework dependency beyond what those already
+carry. `:sync:work` is the only module that knows WorkManager exists: it holds `SyncWorker`
+(the `CoroutineWorker`) and `WorkManagerSyncTrigger`, the sole implementation of `:core:data`'s
+`SyncTrigger` interface (`requestSync()` / `requestImmediateSync()`) that `NoteRepositoryImpl` and
+`NoteEditorViewModel` call after a write. Neither of those two ever depends on `:sync:work`, or
+even knows WorkManager is the mechanism behind `SyncTrigger` — Hilt resolves the binding at
+`:app`, where both `:core:data` and `:sync:work` are on the classpath together. Swapping the
+trigger mechanism (a different scheduler, a test double) means writing a new `SyncTrigger` and
+touching `:app`'s dependency list — nothing else.
+
+**`:core:testing`** holds `FakeTransport`, a `SyncTransport` test double currently used only by
+`SyncEngineTest`. It's a separate module rather than living inside `:core:sync`'s own test sources
+so the next module that needs a scriptable `SyncTransport` for its own tests has somewhere to
+`testImplementation` it from, rather than depending on another module's test sources (which Gradle
+doesn't expose) or copy-pasting the fake.
 
 **This repo owns the client only.** There's no owned reference server implementation: the app is
 a correct client of a wire contract — specified in [`openapi/offline-notes.yaml`](openapi/offline-notes.yaml)
@@ -160,7 +184,7 @@ is an ordinary `UPDATE` op with the same idempotency and CAS as any other write.
 | Periodic | Long-interval backstop only (≥ 6h). |
 
 **W is the bounded data-loss window** — the maximum span of typing that exists on one device
-only — named as such in [`SyncScheduler`](core/sync/src/main/kotlin/com/savvasg/offlinenotes/core/sync/SyncScheduler.kt).
+only — named as such in [`WorkManagerSyncTrigger`](sync/work/src/main/kotlin/com/savvasg/offlinenotes/sync/work/WorkManagerSyncTrigger.kt).
 It's delay-*from-first-edit*, not debounce-from-last: a debounce never fires during continuous
 typing, so staleness would grow unbounded exactly when the user is producing the most unsynced
 work.
@@ -216,7 +240,7 @@ Named scenario tests, each corresponding to a real defect found while designing 
 | `pull_skips_notes_with_pending_ops` | `NoteTransactionsTest`, `SyncEngineTest` | A remote change never clobbers a note being edited locally. |
 | `edit_during_in_flight_creates_second_op_and_loses_nothing` | `NoteTransactionsTest`, `SyncEngineTest` | A mid-flight edit lands in a new op; the ack deletes only the frozen one. |
 | `crash_between_send_and_ack_replays_safely` | `SyncEngineTest` | Stale `IN_FLIGHT` resets to `PENDING` and replays with the *same* `opId` — never a fabricated new one. |
-| `long_editing_session_produces_one_request_per_window` | `SyncSchedulerTest` | 20 debounced schedule calls collapse to one `ENQUEUED` work item. |
+| `long_editing_session_produces_one_request_per_window` | `WorkManagerSyncTriggerTest` | 20 debounced schedule calls collapse to one `ENQUEUED` work item. |
 | FTS DAO tests | `NoteDaoFtsTest` (instrumented) | Search matches title/body, excludes deleted notes, reflects updates. |
 
 Plus `HttpTransportTest` (7 tests, MockWebServer: serialization, status-code → exception mapping)
@@ -241,7 +265,7 @@ notes feature.
 **FCM push.** For a feature-tier product the push taxonomy is cross-team cost; pull-on-foreground
 meets the freshness bar. The consequence — a wider concurrency window, more conflicts — is
 absorbed by the conflict machinery, not by correctness. Adding a push trigger later is additive
-(it's just another caller of `SyncScheduler.expediteSync()`).
+(it's just another caller of `SyncTrigger.requestImmediateSync()`).
 
 **Owning a reference backend (`server-core` + a Ktor `:server` module).** An earlier version of
 this repo did exactly that — a plain-Kotlin state machine (CAS, opId dedupe, a change log) shared

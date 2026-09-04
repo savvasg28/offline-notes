@@ -34,7 +34,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.savvasg.offlinenotes.core.ui.R as CoreUiR
+import com.savvasg.offlinenotes.core.designsystem.R as DesignSystemR
 import com.savvasg.offlinenotes.core.model.SyncState
 
 @Composable
@@ -84,7 +84,7 @@ fun NoteEditorContent(
                 title = {},
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(CoreUiR.string.action_back))
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(DesignSystemR.string.action_back))
                     }
                 },
             )
@@ -98,7 +98,7 @@ fun NoteEditorContent(
                 value = uiState.title,
                 onValueChange = onTitleChange,
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text(stringResource(CoreUiR.string.note_title_hint)) },
+                placeholder = { Text(stringResource(DesignSystemR.string.note_title_hint)) },
                 textStyle = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                 colors = seamlessTextFieldColors(),
                 singleLine = true,
@@ -107,7 +107,7 @@ fun NoteEditorContent(
                 value = uiState.body,
                 onValueChange = onBodyChange,
                 modifier = Modifier.fillMaxSize(),
-                placeholder = { Text(stringResource(CoreUiR.string.note_body_hint)) },
+                placeholder = { Text(stringResource(DesignSystemR.string.note_body_hint)) },
                 textStyle = MaterialTheme.typography.bodyLarge,
                 colors = seamlessTextFieldColors(),
             )
@@ -138,6 +138,6 @@ private fun ConflictBanner(onClick: () -> Unit) {
             color = MaterialTheme.colorScheme.onErrorContainer,
             style = MaterialTheme.typography.bodyMedium,
         )
-        Button(onClick = onClick) { Text(stringResource(CoreUiR.string.action_resolve)) }
+        Button(onClick = onClick) { Text(stringResource(DesignSystemR.string.action_resolve)) }
     }
 }

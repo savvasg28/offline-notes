@@ -12,7 +12,7 @@ import com.savvasg.offlinenotes.core.data.NoteRepositoryImpl
 import com.savvasg.offlinenotes.core.network.dto.DeltaPage
 import com.savvasg.offlinenotes.core.network.dto.OpResult
 import com.savvasg.offlinenotes.core.network.dto.RemoteNote
-import com.savvasg.offlinenotes.core.sync.fake.FakeTransport
+import com.savvasg.offlinenotes.core.testing.FakeTransport
 import io.mockk.mockk
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest

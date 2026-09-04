@@ -6,7 +6,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.Configuration
-import com.savvasg.offlinenotes.core.sync.SyncScheduler
+import com.savvasg.offlinenotes.sync.work.WorkManagerSyncTrigger
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
@@ -17,7 +17,7 @@ class OfflineNotesApplication : Application(), Configuration.Provider {
     lateinit var workerFactory: HiltWorkerFactory
 
     @Inject
-    lateinit var syncScheduler: SyncScheduler
+    lateinit var syncTrigger: WorkManagerSyncTrigger
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
@@ -27,12 +27,12 @@ class OfflineNotesApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
 
-        syncScheduler.schedulePeriodicBackstop()
+        syncTrigger.schedulePeriodicBackstop()
 
         ProcessLifecycleOwner.get().lifecycle.addObserver(
             object : DefaultLifecycleObserver {
                 override fun onStart(owner: LifecycleOwner) {
-                    syncScheduler.expediteSync()
+                    syncTrigger.requestImmediateSync()
                 }
             },
         )

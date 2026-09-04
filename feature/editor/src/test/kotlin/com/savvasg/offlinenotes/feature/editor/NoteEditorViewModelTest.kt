@@ -3,8 +3,8 @@ package com.savvasg.offlinenotes.feature.editor
 import androidx.lifecycle.SavedStateHandle
 import androidx.navigation.testing.invoke
 import com.savvasg.offlinenotes.core.model.Note
-import com.savvasg.offlinenotes.core.domain.NoteRepository
-import com.savvasg.offlinenotes.core.sync.SyncScheduler
+import com.savvasg.offlinenotes.core.data.NoteRepository
+import com.savvasg.offlinenotes.core.data.SyncTrigger
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
@@ -26,7 +26,7 @@ import org.robolectric.RobolectricTestRunner
 class NoteEditorViewModelTest {
 
     private val repository = mockk<NoteRepository>(relaxed = true)
-    private val syncScheduler = mockk<SyncScheduler>(relaxed = true)
+    private val syncTrigger = mockk<SyncTrigger>(relaxed = true)
     private lateinit var viewModel: NoteEditorViewModel
 
     @Before
@@ -34,7 +34,7 @@ class NoteEditorViewModelTest {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         every { repository.observeNote("note-1") } returns MutableStateFlow<Note?>(null)
         val savedStateHandle = SavedStateHandle(route = EditorRoute("note-1"))
-        viewModel = NoteEditorViewModel(repository, syncScheduler, savedStateHandle)
+        viewModel = NoteEditorViewModel(repository, syncTrigger, savedStateHandle)
     }
 
     @After

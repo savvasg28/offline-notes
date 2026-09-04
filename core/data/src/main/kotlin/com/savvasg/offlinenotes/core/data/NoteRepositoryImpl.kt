@@ -13,10 +13,6 @@ import com.savvasg.offlinenotes.core.database.dao.searchActiveNotes
 import com.savvasg.offlinenotes.core.model.Note
 import com.savvasg.offlinenotes.core.model.NoteConflict
 import com.savvasg.offlinenotes.core.model.NoteListItem
-import com.savvasg.offlinenotes.core.domain.NoteRepository
-import com.savvasg.offlinenotes.core.domain.NoteSyncOperations
-import com.savvasg.offlinenotes.core.domain.OpAcknowledgement
-import com.savvasg.offlinenotes.core.sync.SyncScheduler
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
@@ -30,7 +26,7 @@ class NoteRepositoryImpl @Inject constructor(
     private val conflictDao: ConflictDao,
     private val syncMetaDao: SyncMetaDao,
     private val transactions: NoteTransactions,
-    private val syncScheduler: SyncScheduler,
+    private val syncTrigger: SyncTrigger,
 ) : NoteRepository, NoteSyncOperations {
 
     override fun observeNotes(): Flow<List<NoteListItem>> =
@@ -41,17 +37,17 @@ class NoteRepositoryImpl @Inject constructor(
 
     override suspend fun saveNote(id: String, title: String, body: String) {
         transactions.writeTxn(id, title, body, now = System.currentTimeMillis())
-        syncScheduler.scheduleDebouncedSync()
+        syncTrigger.requestSync()
     }
 
     override suspend fun deleteNote(id: String) {
         transactions.deleteTxn(id, now = System.currentTimeMillis())
-        syncScheduler.scheduleDebouncedSync()
+        syncTrigger.requestSync()
     }
 
     override suspend fun resolveConflict(noteId: String, title: String, body: String) {
         transactions.resolveConflictTxn(noteId, title, body, now = System.currentTimeMillis())
-        syncScheduler.scheduleDebouncedSync()
+        syncTrigger.requestSync()
     }
 
     override fun searchNotes(query: String): Flow<List<NoteListItem>> {

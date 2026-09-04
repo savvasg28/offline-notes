@@ -3,7 +3,7 @@ package com.savvasg.offlinenotes.feature.notelist
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.savvasg.offlinenotes.core.model.NoteListItem
-import com.savvasg.offlinenotes.core.domain.NoteRepository
+import com.savvasg.offlinenotes.core.data.NoteRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.UUID
 import javax.inject.Inject

@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import com.savvasg.offlinenotes.core.model.NoteConflict
-import com.savvasg.offlinenotes.core.domain.NoteRepository
+import com.savvasg.offlinenotes.core.data.NoteRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow

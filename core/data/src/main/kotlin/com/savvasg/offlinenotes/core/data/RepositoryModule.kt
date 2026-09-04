@@ -1,8 +1,5 @@
 package com.savvasg.offlinenotes.core.data
 
-import com.savvasg.offlinenotes.core.data.NoteRepositoryImpl
-import com.savvasg.offlinenotes.core.domain.NoteRepository
-import com.savvasg.offlinenotes.core.domain.NoteSyncOperations
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn

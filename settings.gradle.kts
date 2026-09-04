@@ -19,12 +19,14 @@ rootProject.name = "OfflineNotes"
 include(":app")
 
 include(":core:model")
-include(":core:domain")
 include(":core:database")
 include(":core:network")
 include(":core:sync")
 include(":core:data")
-include(":core:ui")
+include(":core:designsystem")
+include(":core:testing")
+
+include(":sync:work")
 
 include(":feature:notelist")
 include(":feature:editor")

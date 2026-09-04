@@ -1,18 +1,13 @@
 plugins {
-    alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kotlin.serialization)
+    id("offlinenotes.android.library")
     alias(libs.plugins.ksp)
+    id("offlinenotes.android.hilt")
     alias(libs.plugins.hilt)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
     namespace = "com.savvasg.offlinenotes.core.network"
-    compileSdk = 35
-
-    defaultConfig {
-        minSdk = 26
-    }
 
     buildTypes {
         release {
@@ -23,31 +18,8 @@ android {
         }
     }
 
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
-    sourceSets {
-        getByName("main") {
-            kotlin.srcDirs("src/main/kotlin")
-        }
-        getByName("test") {
-            kotlin.srcDirs("src/test/kotlin")
-        }
-    }
-
     buildFeatures {
         buildConfig = true
-    }
-
-    testOptions {
-        unitTests {
-            isReturnDefaultValues = true
-        }
     }
 }
 
@@ -58,9 +30,6 @@ dependencies {
     implementation(libs.retrofit.kotlinx.serialization)
     implementation(libs.okhttp.core)
     implementation(libs.kotlinx.serialization.json)
-
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.compiler)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
