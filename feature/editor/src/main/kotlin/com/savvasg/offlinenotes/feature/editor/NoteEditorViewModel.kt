@@ -5,8 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import com.savvasg.offlinenotes.core.model.SyncState
-import com.savvasg.offlinenotes.core.data.NoteRepository
-import com.savvasg.offlinenotes.core.data.SyncTrigger
+import com.savvasg.offlinenotes.core.domain.ObserveNoteUseCase
+import com.savvasg.offlinenotes.core.domain.SaveNoteEditUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.NonCancellable
@@ -26,8 +26,8 @@ data class NoteEditorUiState(
 
 @HiltViewModel
 class NoteEditorViewModel @Inject constructor(
-    private val repository: NoteRepository,
-    private val syncTrigger: SyncTrigger,
+    private val observeNote: ObserveNoteUseCase,
+    private val saveNoteEdit: SaveNoteEditUseCase,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -42,7 +42,7 @@ class NoteEditorViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            repository.observeNote(noteId).collect { note ->
+            observeNote(noteId).collect { note ->
                 if (note == null) return@collect
                 hasPersistedOnce = true
                 mutableUiState.update { current ->
@@ -82,8 +82,7 @@ class NoteEditorViewModel @Inject constructor(
         hasPersistedOnce = true
         hasUserEdited = false
         viewModelScope.launch(NonCancellable) {
-            repository.saveNote(noteId, state.title, state.body)
-            if (alsoSync) syncTrigger.requestImmediateSync()
+            saveNoteEdit(noteId, state.title, state.body, alsoSync)
         }
     }
 

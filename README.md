@@ -57,6 +57,7 @@ flowchart TD
     fco[":feature:conflict"]
     cds[":core:designsystem"]
     cdata[":core:data"]
+    cdom[":core:domain"]
     sengine[":sync:engine"]
     swork[":sync:work"]
     cdb[":core:database"]
@@ -65,10 +66,11 @@ flowchart TD
     cmodel[":core:model"]
 
     app --> fnl & fed & fco
-    app --> cdata & cdb & cnet & cds & swork
-    fnl --> cmodel & cdata & cds
-    fed --> cmodel & cdata & cds
-    fco --> cmodel & cdata & cds
+    app --> cdata & cdom & cdb & cnet & cds & swork
+    fnl --> cmodel & cdom & cds
+    fed --> cmodel & cdom & cds
+    fco --> cmodel & cdom & cds
+    cdom --> cmodel & cdata
     swork --> cdata & sengine
     sengine --> cmodel & cdata & cnet
     cdata --> cmodel & cdb
@@ -81,18 +83,26 @@ Each arrow is `implementation`, not `api` — a module sees only what it directl
 what its dependencies depend on. `:core:model` is the only module every other module can see; it's
 a plain Kotlin/JVM module with no Android dependency, so it can't smuggle one in by accident.
 
-**No `:core:domain` module, on purpose.** The domain layer didn't disappear — it's `:core:model`
-(the plain-Kotlin domain types: `Note`, `NoteConflict`, `SyncModels`) plus `NoteRepository` /
-`NoteSyncOperations` / `SyncTrigger`, which live directly in `:core:data`, next to the one class
-that implements all three. An earlier version of this graph put those interfaces in a standalone
-`:core:domain` module instead, separate from `:core:data`'s implementation of them. That split
-existed for exactly one reason: the sync engine needed to see `NoteSyncOperations` without
-depending on `:core:data`, because `:core:data` depended on the engine right back (for the
-WorkManager scheduler) — an actual cycle if interface and impl lived together. Once the WorkManager
-trigger moved out into its own module (`:sync:work`, below), that reverse edge disappeared, and
-with it the only reason `:core:domain` existed. This app has no use cases, no logic that composes
-multiple repositories — just one repository behind two interfaces plus a trigger — so a "domain
-layer" module was never earning its name.
+**`:core:domain` is where the use cases live** — `ObserveNotesUseCase`, `DeleteNoteUseCase`,
+`ObserveNoteUseCase`, `SaveNoteEditUseCase`, `ObserveConflictUseCase`, `ResolveConflictUseCase` —
+one per ViewModel operation. Feature modules depend on `:core:domain`, never on `:core:data`
+directly: no ViewModel in this app sees `NoteRepository` or `SyncTrigger`. Most of these use cases
+are one line forwarding straight to the repository, and that's fine — the point of the boundary
+isn't that every use case must hide complexity, it's that ViewModels depend on a stable, testable
+seam instead of the repository interface itself, so business logic has somewhere to grow without
+ever touching a ViewModel. `SaveNoteEditUseCase` is where that already pays for itself: it's the
+one place in the app composing two collaborators (`NoteRepository` and `SyncTrigger`) into one
+policy — "persist the edit, and only when leaving the editor with something unsynced, ask for an
+immediate sync instead of waiting out the debounce" — that the editor ViewModel used to assemble
+itself, holding both dependencies just to sequence them.
+
+Repository *interfaces* (`NoteRepository`, `NoteSyncOperations`, `SyncTrigger`) still live in
+`:core:data`, next to `NoteRepositoryImpl` — not in `:core:domain` — because `:core:domain` depends
+on `:core:data` to call them, and an interface can't live downstream of the module that calls it.
+This is also why `:core:domain` couldn't have existed before the WorkManager trigger moved into
+its own module (`:sync:work`, below): the sync engine needs `NoteSyncOperations` without depending
+on `:core:data`, and `:core:data` used to depend on the sync engine right back (for the scheduler)
+— an actual cycle, had `:core:domain` sat between them the way it does now.
 
 **`:sync:engine` and `:sync:work` are two modules, both under `:sync:`, for one reason: WorkManager.**
 `:sync:engine` (`SyncEngine`, the freeze→push→apply→pull orchestration) depends only on
@@ -100,7 +110,7 @@ layer" module was never earning its name.
 carry. `:sync:work` is the only module that knows WorkManager exists: it holds `SyncWorker`
 (the `CoroutineWorker`) and `WorkManagerSyncTrigger`, the sole implementation of `:core:data`'s
 `SyncTrigger` interface (`requestSync()` / `requestImmediateSync()`) that `NoteRepositoryImpl` and
-`NoteEditorViewModel` call after a write. Neither of those two ever depends on `:sync:work`, or
+`SaveNoteEditUseCase` call after a write. Neither of those two ever depends on `:sync:work`, or
 even knows WorkManager is the mechanism behind `SyncTrigger` — Hilt resolves the binding at
 `:app`, where both `:core:data` and `:sync:work` are on the classpath together. Swapping the
 trigger mechanism (a different scheduler, a test double) means writing a new `SyncTrigger` and

@@ -22,6 +22,7 @@ include(":core:model")
 include(":core:database")
 include(":core:network")
 include(":core:data")
+include(":core:domain")
 include(":core:designsystem")
 include(":core:testing")
 

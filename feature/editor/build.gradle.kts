@@ -17,7 +17,7 @@ android {
 
 dependencies {
     implementation(project(":core:model"))
-    implementation(project(":core:data"))
+    implementation(project(":core:domain"))
     implementation(project(":core:designsystem"))
 
     implementation(libs.kotlinx.serialization.json)
@@ -42,4 +42,5 @@ dependencies {
     testImplementation(libs.androidx.test.ext.junit)
     testImplementation(libs.truth)
     testImplementation(libs.mockk)
+    testImplementation(project(":core:data"))
 }

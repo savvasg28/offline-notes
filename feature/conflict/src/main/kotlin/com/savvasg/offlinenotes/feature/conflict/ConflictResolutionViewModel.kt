@@ -5,7 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import com.savvasg.offlinenotes.core.model.NoteConflict
-import com.savvasg.offlinenotes.core.data.NoteRepository
+import com.savvasg.offlinenotes.core.domain.ObserveConflictUseCase
+import com.savvasg.offlinenotes.core.domain.ResolveConflictUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,13 +24,14 @@ data class ConflictResolutionUiState(
 
 @HiltViewModel
 class ConflictResolutionViewModel @Inject constructor(
-    private val repository: NoteRepository,
+    observeConflict: ObserveConflictUseCase,
+    private val resolveConflict: ResolveConflictUseCase,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
     val noteId: String = savedStateHandle.toRoute<ConflictRoute>().noteId
 
-    private val conflict: StateFlow<NoteConflict?> = repository.observeConflict(noteId)
+    private val conflict: StateFlow<NoteConflict?> = observeConflict(noteId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val draft = MutableStateFlow<Pair<String, String>?>(null)
@@ -62,7 +64,7 @@ class ConflictResolutionViewModel @Inject constructor(
         val state = uiState.value
         if (state.conflict == null) return
         viewModelScope.launch {
-            repository.resolveConflict(noteId, state.draftTitle, state.draftBody)
+            resolveConflict(noteId, state.draftTitle, state.draftBody)
             onDone()
         }
     }

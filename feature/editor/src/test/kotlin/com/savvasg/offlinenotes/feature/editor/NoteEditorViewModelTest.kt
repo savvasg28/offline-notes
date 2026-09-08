@@ -5,6 +5,8 @@ import androidx.navigation.testing.invoke
 import com.savvasg.offlinenotes.core.model.Note
 import com.savvasg.offlinenotes.core.data.NoteRepository
 import com.savvasg.offlinenotes.core.data.SyncTrigger
+import com.savvasg.offlinenotes.core.domain.ObserveNoteUseCase
+import com.savvasg.offlinenotes.core.domain.SaveNoteEditUseCase
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
@@ -34,7 +36,11 @@ class NoteEditorViewModelTest {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         every { repository.observeNote("note-1") } returns MutableStateFlow<Note?>(null)
         val savedStateHandle = SavedStateHandle(route = EditorRoute("note-1"))
-        viewModel = NoteEditorViewModel(repository, syncTrigger, savedStateHandle)
+        viewModel = NoteEditorViewModel(
+            ObserveNoteUseCase(repository),
+            SaveNoteEditUseCase(repository, syncTrigger),
+            savedStateHandle,
+        )
     }
 
     @After
