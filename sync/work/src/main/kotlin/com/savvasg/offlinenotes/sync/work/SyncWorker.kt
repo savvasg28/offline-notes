@@ -4,8 +4,8 @@ import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.savvasg.offlinenotes.core.sync.SyncEngine
-import com.savvasg.offlinenotes.core.sync.SyncOutcome
+import com.savvasg.offlinenotes.sync.engine.SyncEngine
+import com.savvasg.offlinenotes.sync.engine.SyncOutcome
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 

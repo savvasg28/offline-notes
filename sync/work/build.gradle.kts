@@ -11,7 +11,7 @@ android {
 
 dependencies {
     implementation(project(":core:data"))
-    implementation(project(":core:sync"))
+    implementation(project(":sync:engine"))
 
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.kotlinx.coroutines.core)

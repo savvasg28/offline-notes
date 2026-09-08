@@ -1,4 +1,4 @@
-package com.savvasg.offlinenotes.core.sync
+package com.savvasg.offlinenotes.sync.engine
 
 import android.content.Context
 import androidx.room.Room

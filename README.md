@@ -57,7 +57,7 @@ flowchart TD
     fco[":feature:conflict"]
     cds[":core:designsystem"]
     cdata[":core:data"]
-    csync[":core:sync"]
+    sengine[":sync:engine"]
     swork[":sync:work"]
     cdb[":core:database"]
     cnet[":core:network"]
@@ -69,8 +69,8 @@ flowchart TD
     fnl --> cmodel & cdata & cds
     fed --> cmodel & cdata & cds
     fco --> cmodel & cdata & cds
-    swork --> cdata & csync
-    csync --> cmodel & cdata & cnet
+    swork --> cdata & sengine
+    sengine --> cmodel & cdata & cnet
     cdata --> cmodel & cdb
     cdb --> cmodel
     cnet --> cmodel
@@ -81,20 +81,21 @@ Each arrow is `implementation`, not `api` — a module sees only what it directl
 what its dependencies depend on. `:core:model` is the only module every other module can see; it's
 a plain Kotlin/JVM module with no Android dependency, so it can't smuggle one in by accident.
 
-**No `:core:domain` module, on purpose.** An earlier version of this graph put `NoteRepository`
-and `NoteSyncOperations` in a standalone `:core:domain` module, separate from `:core:data`'s
-implementation of them. That split existed for exactly one reason: `:core:sync` needed to see
-`NoteSyncOperations` without depending on `:core:data`, because `:core:data` depended on
-`:core:sync` right back (for the WorkManager scheduler) — an actual cycle if both interface and
-impl lived together. Once the WorkManager trigger moved out into its own module (`:sync:work`,
-below), that reverse edge disappeared, and with it the only reason `:core:domain` existed. This
-app has no use cases, no logic that composes multiple repositories — just one repository behind
-two interfaces — so a "domain layer" module was never earning its name; it's gone, and
-`NoteRepository`/`NoteSyncOperations` now live directly in `:core:data`, next to the one class
-that implements both.
+**No `:core:domain` module, on purpose.** The domain layer didn't disappear — it's `:core:model`
+(the plain-Kotlin domain types: `Note`, `NoteConflict`, `SyncModels`) plus `NoteRepository` /
+`NoteSyncOperations` / `SyncTrigger`, which live directly in `:core:data`, next to the one class
+that implements all three. An earlier version of this graph put those interfaces in a standalone
+`:core:domain` module instead, separate from `:core:data`'s implementation of them. That split
+existed for exactly one reason: the sync engine needed to see `NoteSyncOperations` without
+depending on `:core:data`, because `:core:data` depended on the engine right back (for the
+WorkManager scheduler) — an actual cycle if interface and impl lived together. Once the WorkManager
+trigger moved out into its own module (`:sync:work`, below), that reverse edge disappeared, and
+with it the only reason `:core:domain` existed. This app has no use cases, no logic that composes
+multiple repositories — just one repository behind two interfaces plus a trigger — so a "domain
+layer" module was never earning its name.
 
-**The sync engine and its trigger are two different modules for one reason: WorkManager.**
-`:core:sync` (`SyncEngine`, the freeze→push→apply→pull orchestration) depends only on
+**`:sync:engine` and `:sync:work` are two modules, both under `:sync:`, for one reason: WorkManager.**
+`:sync:engine` (`SyncEngine`, the freeze→push→apply→pull orchestration) depends only on
 `:core:data` and `:core:network` — no Android framework dependency beyond what those already
 carry. `:sync:work` is the only module that knows WorkManager exists: it holds `SyncWorker`
 (the `CoroutineWorker`) and `WorkManagerSyncTrigger`, the sole implementation of `:core:data`'s
@@ -103,13 +104,17 @@ carry. `:sync:work` is the only module that knows WorkManager exists: it holds `
 even knows WorkManager is the mechanism behind `SyncTrigger` — Hilt resolves the binding at
 `:app`, where both `:core:data` and `:sync:work` are on the classpath together. Swapping the
 trigger mechanism (a different scheduler, a test double) means writing a new `SyncTrigger` and
-touching `:app`'s dependency list — nothing else.
+touching `:app`'s dependency list — nothing else. Both modules sit under `:sync:`, not `:core:`,
+because sync is a vertical subsystem with its own two-part shape (portable engine, platform
+trigger) — `:core:` is reserved for foundational pieces (model, database, network, data,
+designsystem, testing) that any feature might depend on directly, not for a subsystem that
+happens to have a small piece.
 
 **`:core:testing`** holds `FakeTransport`, a `SyncTransport` test double currently used only by
-`SyncEngineTest`. It's a separate module rather than living inside `:core:sync`'s own test sources
-so the next module that needs a scriptable `SyncTransport` for its own tests has somewhere to
-`testImplementation` it from, rather than depending on another module's test sources (which Gradle
-doesn't expose) or copy-pasting the fake.
+`SyncEngineTest`. It's a separate module rather than living inside `:sync:engine`'s own test
+sources so the next module that needs a scriptable `SyncTransport` for its own tests has somewhere
+to `testImplementation` it from, rather than depending on another module's test sources (which
+Gradle doesn't expose) or copy-pasting the fake.
 
 **This repo owns the client only.** There's no owned reference server implementation: the app is
 a correct client of a wire contract — specified in [`openapi/offline-notes.yaml`](openapi/offline-notes.yaml)
@@ -220,8 +225,8 @@ same Mockoon instance to watch two devices converge on shared state.
 ```
 
 Unqualified: unit tests live wherever the thing they test lives (`:core:database`,
-`:core:network`, `:core:sync`, `:core:data`, `:feature:editor`), not all in `:app`, and an
-unqualified Gradle task name runs in every module that declares it.
+`:core:network`, `:sync:engine`, `:sync:work`, `:core:data`, `:feature:editor`), not all in
+`:app`, and an unqualified Gradle task name runs in every module that declares it.
 
 CI (`.github/workflows/ci.yml`) runs both on every push: a plain JVM job for the unit tests, and a
 `reactivecircus/android-emulator-runner` job for the instrumented ones.

@@ -1,4 +1,4 @@
-package com.savvasg.offlinenotes.core.sync
+package com.savvasg.offlinenotes.sync.engine
 
 import com.savvasg.offlinenotes.core.data.NoteSyncOperations
 import com.savvasg.offlinenotes.core.data.OpAcknowledgement

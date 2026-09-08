@@ -21,11 +21,11 @@ include(":app")
 include(":core:model")
 include(":core:database")
 include(":core:network")
-include(":core:sync")
 include(":core:data")
 include(":core:designsystem")
 include(":core:testing")
 
+include(":sync:engine")
 include(":sync:work")
 
 include(":feature:notelist")

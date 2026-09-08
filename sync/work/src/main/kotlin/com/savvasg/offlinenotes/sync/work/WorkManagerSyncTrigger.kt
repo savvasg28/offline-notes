@@ -15,7 +15,7 @@ import javax.inject.Singleton
 
 /**
  * The only implementation of [SyncTrigger]: everything WorkManager-specific about scheduling a
- * sync lives here, not in :core:data or :core:sync, so neither of those needs a WorkManager
+ * sync lives here, not in :core:data or :sync:engine, so neither of those needs a WorkManager
  * dependency at all.
  */
 @Singleton

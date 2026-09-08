@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.savvasg.offlinenotes.core.sync"
+    namespace = "com.savvasg.offlinenotes.sync.engine"
 }
 
 dependencies {
