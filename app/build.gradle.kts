@@ -44,7 +44,7 @@ dependencies {
     implementation(project(":data:network"))
     implementation(project(":data"))
     implementation(project(":core:designsystem"))
-    implementation(project(":data:sync"))
+    implementation(project(":sync"))
     implementation(project(":feature:notelist"))
     implementation(project(":feature:editor"))
     implementation(project(":feature:conflict"))

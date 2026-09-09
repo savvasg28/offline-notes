@@ -10,7 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.savvasg.offlinenotes.core.designsystem.OfflineNotesTheme
+import com.savvasg.offlinenotes.core.designsystem.theme.OfflineNotesTheme
 import com.savvasg.offlinenotes.feature.conflict.ConflictResolutionScreen
 import com.savvasg.offlinenotes.feature.conflict.ConflictRoute
 import com.savvasg.offlinenotes.feature.editor.EditorRoute

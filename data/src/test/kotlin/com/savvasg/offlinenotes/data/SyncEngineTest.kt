@@ -14,7 +14,7 @@ import com.savvasg.offlinenotes.domain.sync.OpOutcome
 import com.savvasg.offlinenotes.domain.sync.RemoteChangePage
 import com.savvasg.offlinenotes.domain.sync.SyncEngine
 import com.savvasg.offlinenotes.domain.sync.SyncOutcome
-import com.savvasg.offlinenotes.core.testing.FakeTransport
+import com.savvasg.offlinenotes.data.testing.FakeTransport
 import io.mockk.mockk
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest

@@ -10,9 +10,6 @@ room {
     schemaDirectory("$projectDir/schemas")
 }
 
-// Belt and braces: the androidx.room plugin's schemaDirectory stopped reaching KSP when this
-// module moved onto the shared convention plugin, silently disabling schema export. Passing the
-// processor argument directly is the documented fallback and is what actually writes schemas/.
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
@@ -27,8 +24,6 @@ android {
 dependencies {
     implementation(project(":domain"))
 
-    // api, not implementation: OfflineNotesDatabase extends RoomDatabase and is built directly by
-    // :data's integration test, which needs RoomDatabase on its own compile classpath.
     api(libs.androidx.room.runtime)
     api(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)

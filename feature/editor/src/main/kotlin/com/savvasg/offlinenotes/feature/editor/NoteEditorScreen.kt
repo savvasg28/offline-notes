@@ -1,40 +1,32 @@
 package com.savvasg.offlinenotes.feature.editor
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.savvasg.offlinenotes.core.designsystem.R as DesignSystemR
+import com.savvasg.offlinenotes.core.designsystem.component.InlineBanner
+import com.savvasg.offlinenotes.core.designsystem.component.NotesTopAppBar
+import com.savvasg.offlinenotes.core.designsystem.component.SeamlessTextField
+import com.savvasg.offlinenotes.core.designsystem.theme.Spacing
 import com.savvasg.offlinenotes.domain.model.SyncState
 
 @Composable
@@ -67,7 +59,6 @@ fun NoteEditorScreen(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NoteEditorContent(
     uiState: NoteEditorUiState,
@@ -79,65 +70,50 @@ fun NoteEditorContent(
 ) {
     Scaffold(
         modifier = modifier,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = {},
+            NotesTopAppBar(
+                title = "",
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(DesignSystemR.string.action_back))
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(DesignSystemR.string.action_back),
+                        )
                     }
                 },
             )
         },
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
             if (uiState.syncState == SyncState.CONFLICT) {
-                ConflictBanner(onClick = onResolveConflict)
+                InlineBanner(
+                    text = stringResource(R.string.editor_conflict_banner),
+                    actionLabel = stringResource(DesignSystemR.string.action_resolve),
+                    onAction = onResolveConflict,
+                )
             }
-            TextField(
+            SeamlessTextField(
                 value = uiState.title,
                 onValueChange = onTitleChange,
+                placeholder = stringResource(DesignSystemR.string.note_title_hint),
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text(stringResource(DesignSystemR.string.note_title_hint)) },
-                textStyle = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                colors = seamlessTextFieldColors(),
+                textStyle = MaterialTheme.typography.headlineSmall,
                 singleLine = true,
             )
-            TextField(
+            SeamlessTextField(
                 value = uiState.body,
                 onValueChange = onBodyChange,
+                placeholder = stringResource(DesignSystemR.string.note_body_hint),
                 modifier = Modifier.fillMaxSize(),
-                placeholder = { Text(stringResource(DesignSystemR.string.note_body_hint)) },
                 textStyle = MaterialTheme.typography.bodyLarge,
-                colors = seamlessTextFieldColors(),
             )
         }
-    }
-}
-
-@Composable
-private fun seamlessTextFieldColors() = TextFieldDefaults.colors(
-    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-    focusedContainerColor = MaterialTheme.colorScheme.surface,
-    unfocusedIndicatorColor = Color.Transparent,
-    focusedIndicatorColor = Color.Transparent,
-)
-
-@Composable
-private fun ConflictBanner(onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.errorContainer)
-            .padding(12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            stringResource(R.string.editor_conflict_banner),
-            color = MaterialTheme.colorScheme.onErrorContainer,
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        Button(onClick = onClick) { Text(stringResource(DesignSystemR.string.action_resolve)) }
     }
 }

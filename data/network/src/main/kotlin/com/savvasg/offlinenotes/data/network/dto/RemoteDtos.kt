@@ -3,11 +3,6 @@ package com.savvasg.offlinenotes.data.network.dto
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/**
- * The wire format, and nothing else. These types mirror `openapi/offline-notes.yaml` exactly; the
- * domain has its own vocabulary and never sees these. [Mappers] is the only translation between
- * the two, so a server-side rename lands in one file.
- */
 @Serializable
 enum class WireOpType { CREATE, UPDATE, DELETE }
 

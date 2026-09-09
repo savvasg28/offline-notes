@@ -11,25 +11,24 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.savvasg.offlinenotes.core.designsystem.R as DesignSystemR
+import com.savvasg.offlinenotes.core.designsystem.component.EmptyState
+import com.savvasg.offlinenotes.core.designsystem.component.LabeledCard
+import com.savvasg.offlinenotes.core.designsystem.component.NotesTopAppBar
+import com.savvasg.offlinenotes.core.designsystem.component.SeamlessTextField
+import com.savvasg.offlinenotes.core.designsystem.theme.Spacing
 
 @Composable
 fun ConflictResolutionScreen(
@@ -50,7 +49,6 @@ fun ConflictResolutionScreen(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConflictResolutionContent(
     uiState: ConflictResolutionUiState,
@@ -64,12 +62,16 @@ fun ConflictResolutionContent(
 ) {
     Scaffold(
         modifier = modifier,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.conflict_title)) },
+            NotesTopAppBar(
+                title = stringResource(R.string.conflict_title),
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(DesignSystemR.string.action_back))
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(DesignSystemR.string.action_back),
+                        )
                     }
                 },
             )
@@ -77,16 +79,17 @@ fun ConflictResolutionContent(
     ) { padding ->
         val conflict = uiState.conflict
         if (conflict == null) {
-            Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
-                Text(stringResource(R.string.conflict_none), style = MaterialTheme.typography.bodyLarge)
-            }
+            EmptyState(
+                title = stringResource(R.string.conflict_none),
+                modifier = Modifier.padding(padding),
+            )
             return@Scaffold
         }
 
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             item {
                 Text(
@@ -95,12 +98,22 @@ fun ConflictResolutionContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            item { VersionCard(label = stringResource(R.string.conflict_version_local), title = conflict.localTitle, body = conflict.localBody) }
+            item {
+                LabeledCard(
+                    label = stringResource(R.string.conflict_version_local),
+                    title = conflict.localTitle.ifBlank { stringResource(DesignSystemR.string.note_untitled) },
+                    body = conflict.localBody,
+                )
+            }
             item {
                 val baseTitle = conflict.baseTitle
                 val baseBody = conflict.baseBody
                 if (baseTitle != null && baseBody != null) {
-                    VersionCard(label = stringResource(R.string.conflict_version_base), title = baseTitle, body = baseBody)
+                    LabeledCard(
+                        label = stringResource(R.string.conflict_version_base),
+                        title = baseTitle.ifBlank { stringResource(DesignSystemR.string.note_untitled) },
+                        body = baseBody,
+                    )
                 } else {
                     Text(
                         stringResource(R.string.conflict_no_base),
@@ -109,46 +122,46 @@ fun ConflictResolutionContent(
                     )
                 }
             }
-            item { VersionCard(label = stringResource(R.string.conflict_version_remote), title = conflict.remoteTitle, body = conflict.remoteBody) }
+            item {
+                LabeledCard(
+                    label = stringResource(R.string.conflict_version_remote),
+                    title = conflict.remoteTitle.ifBlank { stringResource(DesignSystemR.string.note_untitled) },
+                    body = conflict.remoteBody,
+                )
+            }
 
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.conflict_resolution_heading), style = MaterialTheme.typography.titleMedium)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = onUseMine) { Text(stringResource(R.string.conflict_keep_mine)) }
-                        OutlinedButton(onClick = onUseTheirs) { Text(stringResource(R.string.conflict_keep_theirs)) }
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    Text(
+                        stringResource(R.string.conflict_resolution_heading),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        OutlinedButton(onClick = onUseMine, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.conflict_keep_mine))
+                        }
+                        OutlinedButton(onClick = onUseTheirs, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.conflict_keep_theirs))
+                        }
                     }
-                    TextField(
+                    SeamlessTextField(
                         value = uiState.draftTitle,
                         onValueChange = onDraftTitleChange,
+                        placeholder = stringResource(DesignSystemR.string.note_title_hint),
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text(stringResource(DesignSystemR.string.note_title_hint)) },
+                        textStyle = MaterialTheme.typography.titleMedium,
                         singleLine = true,
                     )
-                    TextField(
+                    SeamlessTextField(
                         value = uiState.draftBody,
                         onValueChange = onDraftBodyChange,
+                        placeholder = stringResource(DesignSystemR.string.note_body_hint),
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text(stringResource(DesignSystemR.string.note_body_hint)) },
-                        minLines = 4,
                     )
                     Button(onClick = onResolve, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(DesignSystemR.string.action_resolve))
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun VersionCard(label: String, title: String, body: String) {
-    Card(colors = CardDefaults.cardColors()) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-            Text(title.ifBlank { stringResource(DesignSystemR.string.note_untitled) }, style = MaterialTheme.typography.titleSmall)
-            if (body.isNotBlank()) {
-                Text(body, style = MaterialTheme.typography.bodyMedium)
             }
         }
     }

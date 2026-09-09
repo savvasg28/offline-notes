@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="notes_list_title">Offline Notes</string>
+    <string name="notes_list_title">Notes</string>
     <string name="notes_list_search_hint">Search notes</string>
-    <string name="notes_list_empty">No notes yet — tap + to create one</string>
+    <string name="notes_list_empty">Nothing here yet</string>
+    <string name="notes_list_empty_supporting">Your notes stay on this device and sync when there\'s a connection.</string>
     <string name="notes_list_no_matches">No matches</string>
     <string name="notes_list_new_note">New note</string>
     <string name="notes_list_delete_note">Delete</string>
+    <string name="notes_list_status_synced">Synced</string>
+    <string name="notes_list_status_pending">Waiting to sync</string>
+    <string name="notes_list_status_conflict">Needs review</string>
 </resources>

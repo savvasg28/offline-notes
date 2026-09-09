@@ -22,5 +22,4 @@ dependencies {
     testImplementation(libs.androidx.test.ext.junit)
     testImplementation(libs.truth)
     testImplementation(libs.mockk)
-    testImplementation(project(":core:testing"))
 }

@@ -23,10 +23,9 @@ include(":domain")
 include(":data")
 include(":data:database")
 include(":data:network")
-include(":data:sync")
+include(":sync")
 
 include(":core:designsystem")
-include(":core:testing")
 
 include(":feature:notelist")
 include(":feature:editor")

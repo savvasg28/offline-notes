@@ -41,4 +41,3 @@ class HttpTransport @Inject constructor(private val api: OfflineNotesApi) : Sync
         else -> throw NetworkException("server responded ${response.code()}")
     }
 }
-

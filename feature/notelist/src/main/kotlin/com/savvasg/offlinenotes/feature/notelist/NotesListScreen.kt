@@ -1,43 +1,36 @@
 package com.savvasg.offlinenotes.feature.notelist
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.savvasg.offlinenotes.core.designsystem.R as DesignSystemR
-import com.savvasg.offlinenotes.domain.model.NoteListItem
+import com.savvasg.offlinenotes.core.designsystem.component.EmptyState
+import com.savvasg.offlinenotes.core.designsystem.component.NoteCard
+import com.savvasg.offlinenotes.core.designsystem.component.NotesTopAppBar
+import com.savvasg.offlinenotes.core.designsystem.component.SearchField
+import com.savvasg.offlinenotes.core.designsystem.component.StatusDot
+import com.savvasg.offlinenotes.core.designsystem.theme.OfflineNotesTheme
+import com.savvasg.offlinenotes.core.designsystem.theme.Spacing
 import com.savvasg.offlinenotes.domain.model.SyncState
 import java.text.DateFormat
 import java.util.Date
@@ -59,7 +52,6 @@ fun NotesListScreen(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotesListContent(
     uiState: NotesListUiState,
@@ -71,43 +63,66 @@ fun NotesListContent(
 ) {
     Scaffold(
         modifier = modifier,
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.notes_list_title)) },
-            )
-        },
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = { NotesTopAppBar(title = stringResource(R.string.notes_list_title)) },
         floatingActionButton = {
-            FloatingActionButton(onClick = onNewNote) {
-                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.notes_list_new_note))
-            }
+            ExtendedFloatingActionButton(
+                onClick = onNewNote,
+                icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                text = { Text(stringResource(R.string.notes_list_new_note)) },
+            )
         },
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            TextField(
+            SearchField(
                 value = uiState.searchQuery,
                 onValueChange = onSearchQueryChange,
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                placeholder = { Text(stringResource(R.string.notes_list_search_hint)) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                singleLine = true,
+                placeholder = stringResource(R.string.notes_list_search_hint),
+                modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
             )
 
             if (uiState.notes.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        stringResource(
-                            if (uiState.searchQuery.isBlank()) R.string.notes_list_empty else R.string.notes_list_no_matches,
-                        ),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                EmptyState(
+                    title = stringResource(
+                        if (uiState.searchQuery.isBlank()) R.string.notes_list_empty else R.string.notes_list_no_matches,
+                    ),
+                    supporting = if (uiState.searchQuery.isBlank()) {
+                        stringResource(R.string.notes_list_empty_supporting)
+                    } else {
+                        null
+                    },
+                )
             } else {
-                LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
+                LazyColumn(
+                    contentPadding = PaddingValues(
+                        start = Spacing.lg,
+                        end = Spacing.lg,
+                        top = Spacing.sm,
+                        bottom = Spacing.xxl,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                ) {
                     items(uiState.notes, key = { it.id }) { note ->
-                        NoteRow(
-                            note = note,
+                        NoteCard(
+                            title = note.title.ifBlank { stringResource(DesignSystemR.string.note_untitled) },
+                            snippet = note.bodySnippet,
+                            meta = formatTimestamp(note.lastUpdated),
                             onClick = { onNoteClick(note.id) },
-                            onDelete = { onDeleteNote(note.id) },
+                            leading = {
+                                StatusDot(
+                                    color = note.syncState.color(),
+                                    contentDescription = stringResource(note.syncState.labelRes()),
+                                )
+                            },
+                            trailing = {
+                                IconButton(onClick = { onDeleteNote(note.id) }) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = stringResource(R.string.notes_list_delete_note),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            },
                         )
                     }
                 }
@@ -117,60 +132,17 @@ fun NotesListContent(
 }
 
 @Composable
-private fun NoteRow(note: NoteListItem, onClick: () -> Unit, onDelete: () -> Unit) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        colors = CardDefaults.cardColors(),
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        note.title.ifBlank { stringResource(DesignSystemR.string.note_untitled) },
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(end = 8.dp),
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        SyncStateDot(note.syncState)
-                        IconButton(onClick = onDelete) {
-                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.notes_list_delete_note))
-                        }
-                    }
-                }
-                if (note.bodySnippet.isNotBlank()) {
-                    Text(
-                        note.bodySnippet,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                    )
-                }
-                Text(
-                    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(note.lastUpdated)),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
+private fun SyncState.color(): Color = when (this) {
+    SyncState.SYNCED -> OfflineNotesTheme.statusColors.synced
+    SyncState.PENDING -> OfflineNotesTheme.statusColors.pending
+    SyncState.CONFLICT -> OfflineNotesTheme.statusColors.conflict
 }
 
-@Composable
-private fun SyncStateDot(state: SyncState) {
-    val color = when (state) {
-        SyncState.SYNCED -> MaterialTheme.colorScheme.primary
-        SyncState.PENDING -> MaterialTheme.colorScheme.tertiary
-        SyncState.CONFLICT -> MaterialTheme.colorScheme.error
-    }
-    Box(
-        modifier = Modifier
-            .padding(end = 8.dp)
-            .size(10.dp)
-            .background(color, CircleShape),
-    )
+private fun SyncState.labelRes(): Int = when (this) {
+    SyncState.SYNCED -> R.string.notes_list_status_synced
+    SyncState.PENDING -> R.string.notes_list_status_pending
+    SyncState.CONFLICT -> R.string.notes_list_status_conflict
 }
+
+private fun formatTimestamp(millis: Long): String =
+    DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(millis))
