@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.savvasg.offlinenotes.core.designsystem.theme.Spacing
 
 @Composable
-fun NoteCard(
+fun ContentCard(
     title: String,
     snippet: String,
     meta: String,

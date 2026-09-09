@@ -28,10 +28,10 @@ data class RemoteChangePage(
 
 class SyncTokenExpiredException : Exception("sync token expired; client must clear it and re-bootstrap")
 
-sealed class TransportException(message: String) : Exception(message)
+sealed class TransportException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 class AuthFailureException : TransportException("auth failure")
 
 class RateLimitException : TransportException("rate limited")
 
-class NetworkException(message: String) : TransportException(message)
+class NetworkException(message: String, cause: Throwable? = null) : TransportException(message, cause)

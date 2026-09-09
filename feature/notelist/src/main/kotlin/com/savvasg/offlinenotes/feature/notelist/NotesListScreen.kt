@@ -23,9 +23,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.savvasg.offlinenotes.core.designsystem.R as DesignSystemR
+import com.savvasg.offlinenotes.core.designsystem.component.ContentCard
 import com.savvasg.offlinenotes.core.designsystem.component.EmptyState
-import com.savvasg.offlinenotes.core.designsystem.component.NoteCard
 import com.savvasg.offlinenotes.core.designsystem.component.NotesTopAppBar
 import com.savvasg.offlinenotes.core.designsystem.component.SearchField
 import com.savvasg.offlinenotes.core.designsystem.component.StatusDot
@@ -34,6 +33,7 @@ import com.savvasg.offlinenotes.core.designsystem.theme.Spacing
 import com.savvasg.offlinenotes.domain.model.SyncState
 import java.text.DateFormat
 import java.util.Date
+import com.savvasg.offlinenotes.core.designsystem.R as DesignSystemR
 
 @Composable
 fun NotesListScreen(
@@ -103,7 +103,7 @@ fun NotesListContent(
                     verticalArrangement = Arrangement.spacedBy(Spacing.md),
                 ) {
                     items(uiState.notes, key = { it.id }) { note ->
-                        NoteCard(
+                        ContentCard(
                             title = note.title.ifBlank { stringResource(DesignSystemR.string.note_untitled) },
                             snippet = note.bodySnippet,
                             meta = formatTimestamp(note.lastUpdated),

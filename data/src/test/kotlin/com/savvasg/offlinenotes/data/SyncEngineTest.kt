@@ -7,14 +7,13 @@ import com.google.common.truth.Truth.assertThat
 import com.savvasg.offlinenotes.data.database.NoteTransactions
 import com.savvasg.offlinenotes.data.database.OfflineNotesDatabase
 import com.savvasg.offlinenotes.data.database.entity.OutboxStatus
-import com.savvasg.offlinenotes.domain.model.SyncState
-import com.savvasg.offlinenotes.data.NoteRepositoryImpl
+import com.savvasg.offlinenotes.data.testing.FakeTransport
 import com.savvasg.offlinenotes.domain.model.RemoteNoteChange
+import com.savvasg.offlinenotes.domain.model.SyncState
 import com.savvasg.offlinenotes.domain.sync.OpOutcome
 import com.savvasg.offlinenotes.domain.sync.RemoteChangePage
 import com.savvasg.offlinenotes.domain.sync.SyncEngine
 import com.savvasg.offlinenotes.domain.sync.SyncOutcome
-import com.savvasg.offlinenotes.data.testing.FakeTransport
 import io.mockk.mockk
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -131,7 +130,8 @@ class SyncEngineTest {
 
         repository.saveNote("note-1", "Local In Progress", "Local In Progress Body")
 
-        val remoteChange = RemoteNoteChange("note-1", version = "99", isDeleted = false, title = "Remote Title", body = "Remote Body")
+        val remoteChange =
+            RemoteNoteChange("note-1", version = "99", isDeleted = false, title = "Remote Title", body = "Remote Body")
         repository.applyDelta(listOf(remoteChange), newSyncToken = "99")
 
         val note = repository.observeNote("note-1").first()!!
@@ -145,7 +145,15 @@ class SyncEngineTest {
 
         transport.queueNextPullPage(
             RemoteChangePage(
-                notes = listOf(RemoteNoteChange("note-1", version = "999", isDeleted = false, title = "Remote Title", body = "Remote Body")),
+                notes = listOf(
+                    RemoteNoteChange(
+                        "note-1",
+                        version = "999",
+                        isDeleted = false,
+                        title = "Remote Title",
+                        body = "Remote Body",
+                    ),
+                ),
                 nextSyncToken = "999",
                 hasMore = false,
             ),

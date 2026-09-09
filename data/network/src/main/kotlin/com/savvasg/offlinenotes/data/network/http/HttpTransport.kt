@@ -12,10 +12,10 @@ import com.savvasg.offlinenotes.domain.sync.RateLimitException
 import com.savvasg.offlinenotes.domain.sync.RemoteChangePage
 import com.savvasg.offlinenotes.domain.sync.SyncTokenExpiredException
 import com.savvasg.offlinenotes.domain.sync.SyncTransport
+import retrofit2.Response
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
-import retrofit2.Response
 
 @Singleton
 class HttpTransport @Inject constructor(private val api: OfflineNotesApi) : SyncTransport {
@@ -30,14 +30,21 @@ class HttpTransport @Inject constructor(private val api: OfflineNotesApi) : Sync
     private suspend fun <T> runCatchingIo(call: suspend () -> Response<T>): Response<T> = try {
         call()
     } catch (e: IOException) {
-        throw NetworkException(e.message ?: "network error")
+        throw NetworkException(e.message ?: "network error", e)
     }
 
     private fun <T> unwrap(response: Response<T>, isPull: Boolean = false): T = when (response.code()) {
-        in 200..299 -> response.body() ?: throw NetworkException("empty ${response.raw().request.method} response")
-        401 -> throw AuthFailureException()
-        429 -> throw RateLimitException()
-        410 -> if (isPull) throw SyncTokenExpiredException() else throw NetworkException("unexpected 410")
+        in SUCCESS -> response.body() ?: throw NetworkException("empty ${response.raw().request.method} response")
+        UNAUTHORIZED -> throw AuthFailureException()
+        TOO_MANY_REQUESTS -> throw RateLimitException()
+        GONE -> if (isPull) throw SyncTokenExpiredException() else throw NetworkException("unexpected $GONE")
         else -> throw NetworkException("server responded ${response.code()}")
+    }
+
+    private companion object {
+        val SUCCESS = 200..299
+        const val UNAUTHORIZED = 401
+        const val TOO_MANY_REQUESTS = 429
+        const val GONE = 410
     }
 }

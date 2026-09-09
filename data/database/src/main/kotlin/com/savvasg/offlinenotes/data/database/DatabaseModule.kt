@@ -2,9 +2,9 @@ package com.savvasg.offlinenotes.data.database
 
 import android.content.Context
 import androidx.room.Room
+import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import com.savvasg.offlinenotes.data.database.dao.ConflictDao
 import com.savvasg.offlinenotes.data.database.dao.NoteDao
-import com.savvasg.offlinenotes.data.database.OfflineNotesDatabase
 import com.savvasg.offlinenotes.data.database.dao.OutboxDao
 import com.savvasg.offlinenotes.data.database.dao.SyncMetaDao
 import dagger.Module
@@ -12,9 +12,8 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import androidx.sqlite.driver.bundled.BundledSQLiteDriver
-import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
+import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)

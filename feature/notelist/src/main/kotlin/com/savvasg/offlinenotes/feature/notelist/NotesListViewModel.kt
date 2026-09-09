@@ -2,13 +2,13 @@ package com.savvasg.offlinenotes.feature.notelist
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.savvasg.offlinenotes.domain.model.NoteListItem
+import com.savvasg.offlinenotes.domain.model.NoteSummary
 import com.savvasg.offlinenotes.domain.usecase.DeleteNoteUseCase
 import com.savvasg.offlinenotes.domain.usecase.ObserveNotesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.util.UUID
-import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,13 +17,15 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.util.UUID
+import javax.inject.Inject
 
 data class NotesListUiState(
     val searchQuery: String = "",
-    val notes: List<NoteListItem> = emptyList(),
+    val notes: List<NoteSummary> = emptyList(),
 )
 
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 @HiltViewModel
 class NotesListViewModel @Inject constructor(
     private val observeNotes: ObserveNotesUseCase,
@@ -32,13 +34,13 @@ class NotesListViewModel @Inject constructor(
 
     private val searchQuery = MutableStateFlow("")
 
-    val uiState: StateFlow<NotesListUiState> = combine(
-        searchQuery,
-        searchQuery
-            .debounce(SEARCH_DEBOUNCE_MS)
-            .flatMapLatest { query -> observeNotes(query) },
-    ) { query, notes -> NotesListUiState(query, notes) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NotesListUiState())
+    private val matchingNotes: Flow<List<NoteSummary>> = searchQuery
+        .debounce { query -> if (query.isEmpty()) 0L else SEARCH_DEBOUNCE_MS }
+        .flatMapLatest { query -> observeNotes(query) }
+
+    val uiState: StateFlow<NotesListUiState> =
+        combine(searchQuery, matchingNotes, ::NotesListUiState)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NotesListUiState())
 
     fun onSearchQueryChange(query: String) {
         searchQuery.value = query

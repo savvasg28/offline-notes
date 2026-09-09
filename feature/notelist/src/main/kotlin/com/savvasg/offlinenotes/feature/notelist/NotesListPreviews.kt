@@ -6,32 +6,32 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import com.savvasg.offlinenotes.core.designsystem.theme.OfflineNotesTheme
-import com.savvasg.offlinenotes.domain.model.NoteListItem
+import com.savvasg.offlinenotes.domain.model.NoteSummary
 import com.savvasg.offlinenotes.domain.model.SyncState
 
 private const val DAY = 86_400_000L
-private val NOW = 1_760_000_000_000L
+private const val NOW = 1_760_000_000_000L
 
 class NotesListUiStateProvider : PreviewParameterProvider<NotesListUiState> {
     override val values = sequenceOf(
         NotesListUiState(
             searchQuery = "",
             notes = listOf(
-                NoteListItem(
+                NoteSummary(
                     id = "1",
                     title = "Weekly review",
                     bodySnippet = "Ship the sync engine rewrite, then look at the conflict banner copy once more.",
                     lastUpdated = NOW,
                     syncState = SyncState.SYNCED,
                 ),
-                NoteListItem(
+                NoteSummary(
                     id = "2",
                     title = "Groceries",
                     bodySnippet = "Olive oil, sourdough, coffee beans, something green.",
                     lastUpdated = NOW - DAY,
                     syncState = SyncState.PENDING,
                 ),
-                NoteListItem(
+                NoteSummary(
                     id = "3",
                     title = "",
                     bodySnippet = "",

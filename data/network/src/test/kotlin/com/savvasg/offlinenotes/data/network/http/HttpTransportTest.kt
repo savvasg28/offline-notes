@@ -1,13 +1,13 @@
 package com.savvasg.offlinenotes.data.network.http
 
 import com.google.common.truth.Truth.assertThat
-import com.savvasg.offlinenotes.domain.sync.AuthFailureException
 import com.savvasg.offlinenotes.domain.model.FrozenOutboxOp
+import com.savvasg.offlinenotes.domain.model.OpType
+import com.savvasg.offlinenotes.domain.sync.AuthFailureException
+import com.savvasg.offlinenotes.domain.sync.NetworkException
 import com.savvasg.offlinenotes.domain.sync.OpOutcome
 import com.savvasg.offlinenotes.domain.sync.RateLimitException
-import com.savvasg.offlinenotes.domain.sync.NetworkException
 import com.savvasg.offlinenotes.domain.sync.SyncTokenExpiredException
-import com.savvasg.offlinenotes.domain.model.OpType
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType

@@ -31,7 +31,7 @@ class NoteTransactions @Inject constructor(
     private suspend fun <R> transaction(block: suspend () -> R): R =
         db.useWriterConnection { connection -> connection.immediateTransaction { block() } }
 
-    suspend fun writeTxn(noteId: String, title: String, body: String, now: Long) {
+    suspend fun write(noteId: String, title: String, body: String, now: Long) {
         transaction {
             val existing = noteDao.getNote(noteId)
             noteDao.upsert(
@@ -67,7 +67,7 @@ class NoteTransactions @Inject constructor(
         }
     }
 
-    suspend fun deleteTxn(noteId: String, now: Long) {
+    suspend fun delete(noteId: String, now: Long) {
         transaction {
             val existing = noteDao.getNote(noteId) ?: return@transaction
             noteDao.upsert(existing.copy(syncState = SyncState.PENDING, isDeleted = true, lastUpdated = now))
@@ -92,7 +92,7 @@ class NoteTransactions @Inject constructor(
         }
     }
 
-    suspend fun freezeTxn(): List<FrozenOutboxOp> = transaction {
+    suspend fun freeze(): List<FrozenOutboxOp> = transaction {
         outboxDao.getPendingOpsOrderedByCreatedAt().map { op ->
             val note = requireNotNull(noteDao.getNote(op.noteId)) {
                 "outbox op ${op.opId} references missing note ${op.noteId}"
@@ -109,7 +109,7 @@ class NoteTransactions @Inject constructor(
         }
     }
 
-    suspend fun applyAppliedTxn(opId: String, newVersion: String) {
+    suspend fun markApplied(opId: String, newVersion: String) {
         transaction {
             val op = outboxDao.getById(opId) ?: return@transaction
             noteDao.updateServerVersion(op.noteId, newVersion)
@@ -119,7 +119,7 @@ class NoteTransactions @Inject constructor(
         }
     }
 
-    suspend fun applyConflictTxn(opId: String, conflict: ConflictPayload, detectedAt: Long) {
+    suspend fun stageConflict(opId: String, conflict: ConflictPayload, detectedAt: Long) {
         transaction {
             val op = outboxDao.getById(opId) ?: return@transaction
             outboxDao.updateStatus(opId, OutboxStatus.PARKED)
@@ -140,68 +140,76 @@ class NoteTransactions @Inject constructor(
         }
     }
 
-    suspend fun applyRejectedTxn(opId: String): OutboxEntity? = transaction {
+    suspend fun markRejected(opId: String): OutboxEntity? = transaction {
         val op = outboxDao.getById(opId) ?: return@transaction null
         outboxDao.delete(opId)
         op
     }
 
-    suspend fun applyDeltaTxn(remoteNotes: List<RemoteNoteChange>, newSyncToken: String, now: Long) {
+    suspend fun applyDelta(remoteNotes: List<RemoteNoteChange>, newSyncToken: String, now: Long) {
         transaction {
-            applyRemoteNotesLocked(remoteNotes, now)
+            applyRemoteNotes(remoteNotes, now)
             syncMetaDao.setSyncToken(SyncMetaEntity(syncToken = newSyncToken))
         }
     }
 
-    suspend fun applyBootstrapTxn(remoteNotes: List<RemoteNoteChange>, newSyncToken: String, now: Long) {
+    suspend fun applyBootstrap(remoteNotes: List<RemoteNoteChange>, newSyncToken: String, now: Long) {
         transaction {
-            applyRemoteNotesLocked(remoteNotes, now)
+            applyRemoteNotes(remoteNotes, now)
 
             val remoteIds = remoteNotes.mapTo(mutableSetOf()) { it.noteId }
             for (local in noteDao.getAllSyncedNotes()) {
-                if (local.id in remoteIds) continue
-                if (outboxDao.hasPendingOrInFlight(local.id) || outboxDao.hasParked(local.id)) continue
-                noteDao.purge(local.id)
+                val absentFromSnapshot = local.id !in remoteIds
+                if (absentFromSnapshot && !hasLiveOp(local.id)) {
+                    noteDao.purge(local.id)
+                }
             }
 
             syncMetaDao.setSyncToken(SyncMetaEntity(syncToken = newSyncToken))
         }
     }
 
-    private suspend fun applyRemoteNotesLocked(remoteNotes: List<RemoteNoteChange>, now: Long) {
+    private suspend fun hasLiveOp(noteId: String): Boolean =
+        outboxDao.hasPendingOrInFlight(noteId) || outboxDao.hasParked(noteId)
+
+    private suspend fun applyRemoteNotes(remoteNotes: List<RemoteNoteChange>, now: Long) {
         for (remote in remoteNotes) {
-            when {
-                outboxDao.hasPendingOrInFlight(remote.noteId) -> Unit
-                outboxDao.hasParked(remote.noteId) -> conflictDao.refreshRemote(
-                    remote.noteId,
-                    remote.version,
-                    remote.title.orEmpty(),
-                    remote.body.orEmpty(),
-                )
-                else -> {
-                    val local = noteDao.getNote(remote.noteId)
-                    when {
-                        local?.serverVersion == remote.version -> Unit
-                        remote.isDeleted -> if (local != null) noteDao.purge(remote.noteId)
-                        else -> noteDao.upsert(
-                            NoteEntity(
-                                id = remote.noteId,
-                                title = remote.title.orEmpty(),
-                                body = remote.body.orEmpty(),
-                                serverVersion = remote.version,
-                                syncState = SyncState.SYNCED,
-                                isDeleted = false,
-                                createdAt = local?.createdAt ?: now,
-                                lastUpdated = now,
-                            ),
-                        )
-                    }
-                }
-            }
+            applyRemoteNote(remote, now)
         }
     }
 
-    suspend fun resolveConflictTxn(noteId: String, title: String, body: String, now: Long) {
+    private suspend fun applyRemoteNote(remote: RemoteNoteChange, now: Long) {
+        if (outboxDao.hasPendingOrInFlight(remote.noteId)) return
+        if (outboxDao.hasParked(remote.noteId)) {
+            conflictDao.refreshRemote(
+                remote.noteId,
+                remote.version,
+                remote.title.orEmpty(),
+                remote.body.orEmpty(),
+            )
+            return
+        }
+
+        val local = noteDao.getNote(remote.noteId)
+        when {
+            local?.serverVersion == remote.version -> Unit
+            remote.isDeleted -> if (local != null) noteDao.purge(remote.noteId)
+            else -> noteDao.upsert(
+                NoteEntity(
+                    id = remote.noteId,
+                    title = remote.title.orEmpty(),
+                    body = remote.body.orEmpty(),
+                    serverVersion = remote.version,
+                    syncState = SyncState.SYNCED,
+                    isDeleted = false,
+                    createdAt = local?.createdAt ?: now,
+                    lastUpdated = now,
+                ),
+            )
+        }
+    }
+
+    suspend fun resolveConflict(noteId: String, title: String, body: String, now: Long) {
         transaction {
             val conflict = conflictDao.getForNote(noteId) ?: return@transaction
             outboxDao.delete(conflict.opId)

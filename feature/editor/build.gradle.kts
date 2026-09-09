@@ -16,6 +16,8 @@ android {
 }
 
 dependencies {
+    lintChecks(libs.compose.lint.checks)
+
     implementation(project(":domain"))
     implementation(project(":core:designsystem"))
 

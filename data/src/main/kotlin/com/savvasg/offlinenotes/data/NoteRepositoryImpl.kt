@@ -1,27 +1,27 @@
 package com.savvasg.offlinenotes.data
 
-import com.savvasg.offlinenotes.data.database.dao.ConflictDao
-import com.savvasg.offlinenotes.domain.model.ConflictPayload
-import com.savvasg.offlinenotes.domain.model.FrozenOutboxOp
-import com.savvasg.offlinenotes.data.database.dao.NoteDao
-import com.savvasg.offlinenotes.data.database.entity.NoteEntity
 import com.savvasg.offlinenotes.data.database.NoteTransactions
+import com.savvasg.offlinenotes.data.database.dao.ConflictDao
+import com.savvasg.offlinenotes.data.database.dao.NoteDao
 import com.savvasg.offlinenotes.data.database.dao.OutboxDao
-import com.savvasg.offlinenotes.domain.model.RemoteNoteChange
 import com.savvasg.offlinenotes.data.database.dao.SyncMetaDao
 import com.savvasg.offlinenotes.data.database.dao.searchActiveNotes
+import com.savvasg.offlinenotes.data.database.entity.NoteEntity
+import com.savvasg.offlinenotes.domain.model.ConflictPayload
+import com.savvasg.offlinenotes.domain.model.FrozenOutboxOp
 import com.savvasg.offlinenotes.domain.model.Note
 import com.savvasg.offlinenotes.domain.model.NoteConflict
-import com.savvasg.offlinenotes.domain.model.NoteListItem
+import com.savvasg.offlinenotes.domain.model.NoteSummary
+import com.savvasg.offlinenotes.domain.model.RemoteNoteChange
 import com.savvasg.offlinenotes.domain.repository.NoteRepository
 import com.savvasg.offlinenotes.domain.repository.NoteSyncOperations
 import com.savvasg.offlinenotes.domain.repository.OpAcknowledgement
 import com.savvasg.offlinenotes.domain.sync.SyncTrigger
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import javax.inject.Inject
+import javax.inject.Singleton
 
 @Singleton
 class NoteRepositoryImpl @Inject constructor(
@@ -33,30 +33,30 @@ class NoteRepositoryImpl @Inject constructor(
     private val syncTrigger: SyncTrigger,
 ) : NoteRepository, NoteSyncOperations {
 
-    override fun observeNotes(): Flow<List<NoteListItem>> =
-        noteDao.observeActiveNotes().map { notes -> notes.map { it.toListItem() } }
+    override fun observeNotes(): Flow<List<NoteSummary>> =
+        noteDao.observeActiveNotes().map { notes -> notes.map { it.toSummary() } }
 
     override fun observeNote(id: String): Flow<Note?> =
         noteDao.observeNote(id).map { it?.toDomain() }
 
     override suspend fun saveNote(id: String, title: String, body: String) {
-        transactions.writeTxn(id, title, body, now = System.currentTimeMillis())
+        transactions.write(id, title, body, now = System.currentTimeMillis())
         syncTrigger.requestSync()
     }
 
     override suspend fun deleteNote(id: String) {
-        transactions.deleteTxn(id, now = System.currentTimeMillis())
+        transactions.delete(id, now = System.currentTimeMillis())
         syncTrigger.requestSync()
     }
 
     override suspend fun resolveConflict(noteId: String, title: String, body: String) {
-        transactions.resolveConflictTxn(noteId, title, body, now = System.currentTimeMillis())
+        transactions.resolveConflict(noteId, title, body, now = System.currentTimeMillis())
         syncTrigger.requestSync()
     }
 
-    override fun searchNotes(query: String): Flow<List<NoteListItem>> {
+    override fun searchNotes(query: String): Flow<List<NoteSummary>> {
         val matchQuery = buildFtsMatchQuery(query) ?: return observeNotes()
-        return noteDao.searchActiveNotes(matchQuery).map { notes -> notes.map { it.toListItem() } }
+        return noteDao.searchActiveNotes(matchQuery).map { notes -> notes.map { it.toSummary() } }
     }
 
     override fun observeConflict(noteId: String): Flow<NoteConflict?> =
@@ -75,26 +75,25 @@ class NoteRepositoryImpl @Inject constructor(
             )
         }
 
-
-    override suspend fun freezeAndDrain(): List<FrozenOutboxOp> = transactions.freezeTxn()
+    override suspend fun freezeAndDrain(): List<FrozenOutboxOp> = transactions.freeze()
 
     override suspend fun applyResult(opId: String, ack: OpAcknowledgement) {
         when (ack) {
-            is OpAcknowledgement.Applied -> transactions.applyAppliedTxn(opId, ack.newVersion)
-            OpAcknowledgement.Rejected -> transactions.applyRejectedTxn(opId)
+            is OpAcknowledgement.Applied -> transactions.markApplied(opId, ack.newVersion)
+            OpAcknowledgement.Rejected -> transactions.markRejected(opId)
         }
     }
 
     override suspend fun stageConflict(opId: String, conflict: ConflictPayload) {
-        transactions.applyConflictTxn(opId, conflict, detectedAt = System.currentTimeMillis())
+        transactions.stageConflict(opId, conflict, detectedAt = System.currentTimeMillis())
     }
 
     override suspend fun applyDelta(remoteNotes: List<RemoteNoteChange>, newSyncToken: String) {
-        transactions.applyDeltaTxn(remoteNotes, newSyncToken, now = System.currentTimeMillis())
+        transactions.applyDelta(remoteNotes, newSyncToken, now = System.currentTimeMillis())
     }
 
     override suspend fun applyBootstrap(remoteNotes: List<RemoteNoteChange>, newSyncToken: String) {
-        transactions.applyBootstrapTxn(remoteNotes, newSyncToken, now = System.currentTimeMillis())
+        transactions.applyBootstrap(remoteNotes, newSyncToken, now = System.currentTimeMillis())
     }
 
     override suspend fun resetStaleInFlight() {
@@ -116,10 +115,12 @@ private fun NoteEntity.toDomain() = Note(
     lastUpdated = lastUpdated,
 )
 
-private fun NoteEntity.toListItem() = NoteListItem(
+private const val SNIPPET_LENGTH = 140
+
+private fun NoteEntity.toSummary() = NoteSummary(
     id = id,
     title = title,
-    bodySnippet = body.take(140),
+    bodySnippet = body.take(SNIPPET_LENGTH),
     lastUpdated = lastUpdated,
     syncState = syncState,
 )

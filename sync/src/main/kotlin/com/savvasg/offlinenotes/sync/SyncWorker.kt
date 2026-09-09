@@ -19,8 +19,8 @@ class SyncWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result = when (syncEngine.sync()) {
         SyncOutcome.Done -> Result.success()
-        SyncOutcome.PendingResidue -> {
-            syncTrigger.rescheduleAfterResidue()
+        SyncOutcome.MoreWorkPending -> {
+            syncTrigger.rescheduleForRemainingWork()
             Result.success()
         }
         SyncOutcome.TransportFailure -> Result.retry()

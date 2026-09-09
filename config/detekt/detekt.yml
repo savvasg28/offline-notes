@@ -1,0 +1,47 @@
+build:
+  maxIssues: 0
+
+complexity:
+  LongParameterList:
+    ignoreAnnotated: ['Composable']
+  LongMethod:
+    threshold: 80
+    ignoreAnnotated: ['Composable']
+  TooManyFunctions:
+    thresholdInFiles: 20
+    thresholdInClasses: 20
+    thresholdInInterfaces: 20
+    ignoreAnnotatedFunctions: ['Composable']
+
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Composable']
+  MatchingDeclarationName:
+    excludes: ['**/*Previews.kt']
+  TopLevelPropertyNaming:
+    constantPattern: '[A-Z][_A-Za-z0-9]*'
+
+style:
+  MagicNumber:
+    ignoreAnnotated: ['Composable', 'Preview']
+    ignorePropertyDeclaration: true
+    ignoreCompanionObjectPropertyDeclaration: true
+    ignoreNamedArgument: true
+  MaxLineLength:
+    maxLineLength: 140
+  UnusedPrivateMember:
+    ignoreAnnotated: ['Preview', 'Composable']
+  ReturnCount:
+    max: 4
+
+formatting:
+  Filename:
+    excludes: ['**/*Previews.kt']
+  MaximumLineLength:
+    maxLineLength: 140
+  ArgumentListWrapping:
+    active: false
+  Wrapping:
+    active: false
+  FunctionSignature:
+    active: false

@@ -16,6 +16,8 @@ android {
 }
 
 dependencies {
+    lintChecks(libs.compose.lint.checks)
+
     implementation(project(":domain"))
     implementation(project(":core:designsystem"))
 
@@ -32,4 +34,9 @@ dependencies {
 
     implementation(libs.androidx.navigation.compose)
     implementation(libs.hilt.navigation.compose)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.truth)
+    testImplementation(libs.mockk)
 }

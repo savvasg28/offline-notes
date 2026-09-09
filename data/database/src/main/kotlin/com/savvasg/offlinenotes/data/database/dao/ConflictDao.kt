@@ -21,7 +21,8 @@ interface ConflictDao {
     suspend fun delete(noteId: String)
 
     @Query(
-        "UPDATE note_conflicts SET remoteVersion = :remoteVersion, remoteTitle = :remoteTitle, remoteBody = :remoteBody WHERE noteId = :noteId",
+        "UPDATE note_conflicts SET remoteVersion = :remoteVersion, remoteTitle = :remoteTitle, " +
+            "remoteBody = :remoteBody WHERE noteId = :noteId",
     )
     suspend fun refreshRemote(noteId: String, remoteVersion: String, remoteTitle: String, remoteBody: String)
 }

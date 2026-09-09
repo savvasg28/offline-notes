@@ -8,13 +8,13 @@ import com.savvasg.offlinenotes.domain.model.NoteConflict
 import com.savvasg.offlinenotes.domain.usecase.ObserveConflictUseCase
 import com.savvasg.offlinenotes.domain.usecase.ResolveConflictUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 data class ConflictResolutionUiState(
     val conflict: NoteConflict? = null,

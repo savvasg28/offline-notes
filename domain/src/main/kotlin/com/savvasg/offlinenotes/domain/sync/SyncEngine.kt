@@ -7,7 +7,7 @@ import javax.inject.Inject
 sealed interface SyncOutcome {
     data object Done : SyncOutcome
 
-    data object PendingResidue : SyncOutcome
+    data object MoreWorkPending : SyncOutcome
 
     data object TransportFailure : SyncOutcome
 }
@@ -23,7 +23,7 @@ class SyncEngine @Inject constructor(
         if (frozen.isNotEmpty()) {
             val outcomes = try {
                 transport.pushOps(frozen)
-            } catch (e: TransportException) {
+            } catch (ignored: TransportException) {
                 return SyncOutcome.TransportFailure
             }
             applyOutcomes(outcomes)
@@ -31,7 +31,7 @@ class SyncEngine @Inject constructor(
 
         pullDelta()
 
-        return if (syncOperations.hasPendingOps()) SyncOutcome.PendingResidue else SyncOutcome.Done
+        return if (syncOperations.hasPendingOps()) SyncOutcome.MoreWorkPending else SyncOutcome.Done
     }
 
     private suspend fun applyOutcomes(outcomes: List<OpOutcome>) {
@@ -49,7 +49,7 @@ class SyncEngine @Inject constructor(
         while (true) {
             val page = try {
                 transport.pullDelta(since)
-            } catch (e: SyncTokenExpiredException) {
+            } catch (ignored: SyncTokenExpiredException) {
                 bootstrap()
                 return
             }

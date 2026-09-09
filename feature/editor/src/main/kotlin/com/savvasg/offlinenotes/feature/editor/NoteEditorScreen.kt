@@ -22,12 +22,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.savvasg.offlinenotes.core.designsystem.R as DesignSystemR
 import com.savvasg.offlinenotes.core.designsystem.component.InlineBanner
 import com.savvasg.offlinenotes.core.designsystem.component.NotesTopAppBar
 import com.savvasg.offlinenotes.core.designsystem.component.SeamlessTextField
 import com.savvasg.offlinenotes.core.designsystem.theme.Spacing
 import com.savvasg.offlinenotes.domain.model.SyncState
+import com.savvasg.offlinenotes.core.designsystem.R as DesignSystemR
 
 @Composable
 fun NoteEditorScreen(
@@ -41,12 +41,12 @@ fun NoteEditorScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) currentViewModel.flush()
+            if (event == Lifecycle.Event.ON_STOP) currentViewModel.saveNow()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            currentViewModel.flush()
+            currentViewModel.saveNow()
         }
     }
 

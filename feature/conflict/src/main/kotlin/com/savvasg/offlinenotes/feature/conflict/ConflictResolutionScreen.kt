@@ -23,12 +23,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.savvasg.offlinenotes.core.designsystem.R as DesignSystemR
 import com.savvasg.offlinenotes.core.designsystem.component.EmptyState
 import com.savvasg.offlinenotes.core.designsystem.component.LabeledCard
 import com.savvasg.offlinenotes.core.designsystem.component.NotesTopAppBar
 import com.savvasg.offlinenotes.core.designsystem.component.SeamlessTextField
 import com.savvasg.offlinenotes.core.designsystem.theme.Spacing
+import com.savvasg.offlinenotes.core.designsystem.R as DesignSystemR
 
 @Composable
 fun ConflictResolutionScreen(

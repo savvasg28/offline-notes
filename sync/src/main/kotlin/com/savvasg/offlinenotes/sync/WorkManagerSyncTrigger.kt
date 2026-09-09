@@ -32,7 +32,7 @@ class WorkManagerSyncTrigger @Inject constructor(private val workManager: WorkMa
         workManager.enqueueUniqueWork(SYNC_WORK_NAME, ExistingWorkPolicy.REPLACE, request)
     }
 
-    fun rescheduleAfterResidue() {
+    fun rescheduleForRemainingWork() {
         val request = OneTimeWorkRequestBuilder<SyncWorker>()
             .setInitialDelay(SYNC_DELAY_MILLIS, TimeUnit.MILLISECONDS)
             .setConstraints(NETWORK_CONSTRAINT)

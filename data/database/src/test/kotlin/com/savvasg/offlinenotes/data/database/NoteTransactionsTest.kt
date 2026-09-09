@@ -42,7 +42,7 @@ class NoteTransactionsTest {
 
     @Test
     fun `first edit creates the note and a CREATE op`() = runTest {
-        transactions.writeTxn("note-1", "Title", "Body", now = 1000)
+        transactions.write("note-1", "Title", "Body", now = 1000)
 
         val note = db.noteDao().getNote("note-1")
         assertThat(note).isNotNull()
@@ -58,11 +58,11 @@ class NoteTransactionsTest {
 
     @Test
     fun `only_one_pending_op_per_note - rapid edits coalesce in place`() = runTest {
-        transactions.writeTxn("note-1", "T1", "B1", now = 1000)
+        transactions.write("note-1", "T1", "B1", now = 1000)
         val firstOpId = db.outboxDao().getPendingForNote("note-1")!!.opId
 
-        transactions.writeTxn("note-1", "T2", "B2", now = 1001)
-        transactions.writeTxn("note-1", "T3", "B3", now = 1002)
+        transactions.write("note-1", "T2", "B2", now = 1001)
+        transactions.write("note-1", "T3", "B3", now = 1002)
 
         val ops = db.outboxDao().getPendingOpsOrderedByCreatedAt()
         assertThat(ops).hasSize(1)
@@ -74,7 +74,7 @@ class NoteTransactionsTest {
 
     @Test
     fun `partial unique index rejects a second PENDING op for the same note at the schema level`() = runTest {
-        transactions.writeTxn("note-1", "T1", "B1", now = 1000)
+        transactions.write("note-1", "T1", "B1", now = 1000)
 
         try {
             db.useWriterConnection { connection ->
@@ -92,11 +92,11 @@ class NoteTransactionsTest {
 
     @Test
     fun `edit after the CREATE op is acked produces an UPDATE op`() = runTest {
-        transactions.writeTxn("note-1", "T1", "B1", now = 1000)
+        transactions.write("note-1", "T1", "B1", now = 1000)
         val opId = db.outboxDao().getPendingForNote("note-1")!!.opId
-        transactions.applyAppliedTxn(opId, newVersion = "v1")
+        transactions.markApplied(opId, newVersion = "v1")
 
-        transactions.writeTxn("note-1", "T2", "B2", now = 2000)
+        transactions.write("note-1", "T2", "B2", now = 2000)
 
         val op = db.outboxDao().getPendingForNote("note-1")!!
         assertThat(op.opType).isEqualTo(OpType.UPDATE)
@@ -104,9 +104,9 @@ class NoteTransactionsTest {
 
     @Test
     fun `freeze txn moves PENDING to IN_FLIGHT and resolves baseVersion from serverVersion`() = runTest {
-        transactions.writeTxn("note-1", "T1", "B1", now = 1000)
+        transactions.write("note-1", "T1", "B1", now = 1000)
 
-        val frozen = transactions.freezeTxn()
+        val frozen = transactions.freeze()
 
         assertThat(frozen).hasSize(1)
         assertThat(frozen.single().baseVersion).isNull()
@@ -116,32 +116,32 @@ class NoteTransactionsTest {
 
     @Test
     fun `base_version_resolved_at_drain_not_creation - ships the post-ack version, not the version at op creation`() = runTest {
-        transactions.writeTxn("note-1", "T1", "B1", now = 1000)
+        transactions.write("note-1", "T1", "B1", now = 1000)
         val createOpId = db.outboxDao().getPendingForNote("note-1")!!.opId
-        transactions.applyAppliedTxn(createOpId, newVersion = "v1")
+        transactions.markApplied(createOpId, newVersion = "v1")
 
-        transactions.writeTxn("note-1", "T2", "B2", now = 2000)
-        val frozenFirst = transactions.freezeTxn()
+        transactions.write("note-1", "T2", "B2", now = 2000)
+        val frozenFirst = transactions.freeze()
         assertThat(frozenFirst.single().baseVersion).isEqualTo("v1")
 
-        transactions.writeTxn("note-1", "T3", "B3", now = 3000)
+        transactions.write("note-1", "T3", "B3", now = 3000)
 
-        transactions.applyAppliedTxn(frozenFirst.single().opId, newVersion = "v2")
+        transactions.markApplied(frozenFirst.single().opId, newVersion = "v2")
 
-        val frozenSecond = transactions.freezeTxn()
+        val frozenSecond = transactions.freeze()
         assertThat(frozenSecond).hasSize(1)
         assertThat(frozenSecond.single().baseVersion).isEqualTo("v2")
     }
 
     @Test
     fun `apply_result_never_overwrites_content - APPLIED only moves serverVersion`() = runTest {
-        transactions.writeTxn("note-1", "T1", "B1", now = 1000)
-        val frozen = transactions.freezeTxn()
+        transactions.write("note-1", "T1", "B1", now = 1000)
+        val frozen = transactions.freeze()
         val opId = frozen.single().opId
 
-        transactions.writeTxn("note-1", "T2-live-edit", "B2-live-edit", now = 1500)
+        transactions.write("note-1", "T2-live-edit", "B2-live-edit", now = 1500)
 
-        transactions.applyAppliedTxn(opId, newVersion = "v1")
+        transactions.markApplied(opId, newVersion = "v1")
 
         val note = db.noteDao().getNote("note-1")!!
         assertThat(note.title).isEqualTo("T2-live-edit")
@@ -151,11 +151,11 @@ class NoteTransactionsTest {
     }
 
     @Test
-    fun `applyAppliedTxn sets SYNCED only once no outbox rows remain for the note`() = runTest {
-        transactions.writeTxn("note-1", "T1", "B1", now = 1000)
+    fun `markApplied sets SYNCED only once no outbox rows remain for the note`() = runTest {
+        transactions.write("note-1", "T1", "B1", now = 1000)
         val opId = db.outboxDao().getPendingForNote("note-1")!!.opId
 
-        transactions.applyAppliedTxn(opId, newVersion = "v1")
+        transactions.markApplied(opId, newVersion = "v1")
 
         val note = db.noteDao().getNote("note-1")!!
         assertThat(note.syncState).isEqualTo(SyncState.SYNCED)
@@ -164,15 +164,15 @@ class NoteTransactionsTest {
 
     @Test
     fun `edit_during_in_flight_creates_second_op_and_loses_nothing`() = runTest {
-        transactions.writeTxn("note-1", "T1", "B1", now = 1000)
-        val frozen = transactions.freezeTxn()
+        transactions.write("note-1", "T1", "B1", now = 1000)
+        val frozen = transactions.freeze()
         val firstOpId = frozen.single().opId
 
-        transactions.writeTxn("note-1", "T2", "B2", now = 1500)
+        transactions.write("note-1", "T2", "B2", now = 1500)
         val secondOpId = db.outboxDao().getPendingForNote("note-1")!!.opId
         assertThat(secondOpId).isNotEqualTo(firstOpId)
 
-        transactions.applyAppliedTxn(firstOpId, newVersion = "v1")
+        transactions.markApplied(firstOpId, newVersion = "v1")
 
         assertThat(db.outboxDao().getById(firstOpId)).isNull()
         val remaining = db.outboxDao().getById(secondOpId)
@@ -182,10 +182,10 @@ class NoteTransactionsTest {
 
     @Test
     fun `conflict_parks_op_and_stages_all_three_inputs`() = runTest {
-        transactions.writeTxn("note-1", "Local Title", "Local Body", now = 1000)
+        transactions.write("note-1", "Local Title", "Local Body", now = 1000)
         val opId = db.outboxDao().getPendingForNote("note-1")!!.opId
 
-        transactions.applyConflictTxn(
+        transactions.stageConflict(
             opId,
             ConflictPayload(
                 baseVersion = "v0",
@@ -216,10 +216,10 @@ class NoteTransactionsTest {
 
     @Test
     fun `REJECTED deletes the op and returns it as a poison pill, never retried`() = runTest {
-        transactions.writeTxn("note-1", "T1", "B1", now = 1000)
+        transactions.write("note-1", "T1", "B1", now = 1000)
         val opId = db.outboxDao().getPendingForNote("note-1")!!.opId
 
-        val deleted = transactions.applyRejectedTxn(opId)
+        val deleted = transactions.markRejected(opId)
 
         assertThat(deleted).isNotNull()
         assertThat(deleted!!.opId).isEqualTo(opId)
@@ -227,11 +227,11 @@ class NoteTransactionsTest {
     }
 
     @Test
-    fun `deleteTxn tombstones the note and coalesces into a DELETE op`() = runTest {
-        transactions.writeTxn("note-1", "T1", "B1", now = 1000)
+    fun `delete tombstones the note and coalesces into a DELETE op`() = runTest {
+        transactions.write("note-1", "T1", "B1", now = 1000)
         val opId = db.outboxDao().getPendingForNote("note-1")!!.opId
 
-        transactions.deleteTxn("note-1", now = 2000)
+        transactions.delete("note-1", now = 2000)
 
         val note = db.noteDao().getNote("note-1")!!
         assertThat(note.isDeleted).isTrue()
@@ -244,8 +244,8 @@ class NoteTransactionsTest {
 
     @Test
     fun `resetInFlightToPending resets stale IN_FLIGHT rows for crash recovery`() = runTest {
-        transactions.writeTxn("note-1", "T1", "B1", now = 1000)
-        transactions.freezeTxn()
+        transactions.write("note-1", "T1", "B1", now = 1000)
+        transactions.freeze()
 
         db.outboxDao().resetInFlightToPending()
 
@@ -256,9 +256,9 @@ class NoteTransactionsTest {
 
     @Test
     fun `pull_skips_notes_with_pending_ops - a delta carrying a remote change does not touch a locally-edited note`() = runTest {
-        transactions.writeTxn("note-1", "Local Title", "Local Body", now = 1000)
+        transactions.write("note-1", "Local Title", "Local Body", now = 1000)
 
-        transactions.applyDeltaTxn(
+        transactions.applyDelta(
             remoteNotes = listOf(
                 RemoteNoteChange(noteId = "note-1", version = "v99", isDeleted = false, title = "Remote Title", body = "Remote Body"),
             ),
@@ -274,12 +274,12 @@ class NoteTransactionsTest {
 
     @Test
     fun `delete_edit_race_resurrects - a remote tombstone against a note with a pending edit does not purge it`() = runTest {
-        transactions.writeTxn("note-1", "T1", "B1", now = 1000)
+        transactions.write("note-1", "T1", "B1", now = 1000)
         val opId = db.outboxDao().getPendingForNote("note-1")!!.opId
-        transactions.applyAppliedTxn(opId, newVersion = "v1")
-        transactions.writeTxn("note-1", "T2 (local edit)", "B2 (local edit)", now = 1500)
+        transactions.markApplied(opId, newVersion = "v1")
+        transactions.write("note-1", "T2 (local edit)", "B2 (local edit)", now = 1500)
 
-        transactions.applyDeltaTxn(
+        transactions.applyDelta(
             remoteNotes = listOf(
                 RemoteNoteChange(noteId = "note-1", version = "v2", isDeleted = true, title = null, body = null),
             ),
@@ -295,7 +295,7 @@ class NoteTransactionsTest {
 
     @Test
     fun `applyDelta upserts new remote content and commits the sync token atomically`() = runTest {
-        transactions.applyDeltaTxn(
+        transactions.applyDelta(
             remoteNotes = listOf(
                 RemoteNoteChange(noteId = "note-1", version = "v1", isDeleted = false, title = "From Server", body = "Server Body"),
             ),
@@ -312,15 +312,15 @@ class NoteTransactionsTest {
 
     @Test
     fun `applyDelta against a PARKED note only refreshes the conflict's remote side`() = runTest {
-        transactions.writeTxn("note-1", "Local Title", "Local Body", now = 1000)
+        transactions.write("note-1", "Local Title", "Local Body", now = 1000)
         val opId = db.outboxDao().getPendingForNote("note-1")!!.opId
-        transactions.applyConflictTxn(
+        transactions.stageConflict(
             opId,
             ConflictPayload("v0", "Base Title", "Base Body", "v1", "Remote Title v1", "Remote Body v1"),
             detectedAt = 1500,
         )
 
-        transactions.applyDeltaTxn(
+        transactions.applyDelta(
             remoteNotes = listOf(
                 RemoteNoteChange(noteId = "note-1", version = "v2", isDeleted = false, title = "Remote Title v2", body = "Remote Body v2"),
             ),
@@ -338,15 +338,15 @@ class NoteTransactionsTest {
 
     @Test
     fun `resolution_supersedes_parked_op - one transaction, new op with baseVersion equal to remoteVersion`() = runTest {
-        transactions.writeTxn("note-1", "Local Title", "Local Body", now = 1000)
+        transactions.write("note-1", "Local Title", "Local Body", now = 1000)
         val opId = db.outboxDao().getPendingForNote("note-1")!!.opId
-        transactions.applyConflictTxn(
+        transactions.stageConflict(
             opId,
             ConflictPayload("v0", "Base Title", "Base Body", "v1", "Remote Title", "Remote Body"),
             detectedAt = 1500,
         )
 
-        transactions.resolveConflictTxn("note-1", "Merged Title", "Merged Body", now = 2000)
+        transactions.resolveConflict("note-1", "Merged Title", "Merged Body", now = 2000)
 
         assertThat(db.outboxDao().getById(opId)).isNull()
         assertThat(db.conflictDao().getForNote("note-1")).isNull()
@@ -355,19 +355,19 @@ class NoteTransactionsTest {
         assertThat(newOp.opId).isNotEqualTo(opId)
         assertThat(newOp.title).isEqualTo("Merged Title")
 
-        val frozen = transactions.freezeTxn()
+        val frozen = transactions.freeze()
         assertThat(frozen.single().baseVersion).isEqualTo("v1")
     }
 
     @Test
     fun `expired_token_triggers_rebootstrap - local-only notes survive, previously-synced-and-now-absent notes are purged`() = runTest {
-        transactions.writeTxn("gone-remotely", "T1", "B1", now = 1000)
+        transactions.write("gone-remotely", "T1", "B1", now = 1000)
         val goneOpId = db.outboxDao().getPendingForNote("gone-remotely")!!.opId
-        transactions.applyAppliedTxn(goneOpId, newVersion = "1")
+        transactions.markApplied(goneOpId, newVersion = "1")
 
-        transactions.writeTxn("local-only", "T2", "B2", now = 2000)
+        transactions.write("local-only", "T2", "B2", now = 2000)
 
-        transactions.applyBootstrapTxn(remoteNotes = emptyList(), newSyncToken = "boot-1", now = 3000)
+        transactions.applyBootstrap(remoteNotes = emptyList(), newSyncToken = "boot-1", now = 3000)
 
         assertThat(db.noteDao().getNote("gone-remotely")).isNull()
 
@@ -378,14 +378,14 @@ class NoteTransactionsTest {
     }
 
     @Test
-    fun `applyBootstrapTxn does not purge a note that still has a live op`() = runTest {
-        transactions.writeTxn("note-1", "T1", "B1", now = 1000)
+    fun `applyBootstrap does not purge a note that still has a live op`() = runTest {
+        transactions.write("note-1", "T1", "B1", now = 1000)
         val opId = db.outboxDao().getPendingForNote("note-1")!!.opId
-        transactions.applyAppliedTxn(opId, newVersion = "1")
-        transactions.writeTxn("note-1", "T2", "B2", now = 2000)
-        transactions.freezeTxn()
+        transactions.markApplied(opId, newVersion = "1")
+        transactions.write("note-1", "T2", "B2", now = 2000)
+        transactions.freeze()
 
-        transactions.applyBootstrapTxn(remoteNotes = emptyList(), newSyncToken = "boot-1", now = 3000)
+        transactions.applyBootstrap(remoteNotes = emptyList(), newSyncToken = "boot-1", now = 3000)
 
         assertThat(db.noteDao().getNote("note-1")).isNotNull()
     }

@@ -1,7 +1,7 @@
 package com.savvasg.offlinenotes.data.network
 
-import com.savvasg.offlinenotes.domain.sync.SyncTransport
 import com.savvasg.offlinenotes.data.network.http.HttpTransport
+import com.savvasg.offlinenotes.domain.sync.SyncTransport
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn

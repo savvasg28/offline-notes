@@ -8,7 +8,6 @@ import com.savvasg.offlinenotes.domain.model.SyncState
 import com.savvasg.offlinenotes.domain.usecase.ObserveNoteUseCase
 import com.savvasg.offlinenotes.domain.usecase.SaveNoteEditUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,6 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 data class NoteEditorUiState(
     val title: String = "",
@@ -71,7 +71,7 @@ class NoteEditorViewModel @Inject constructor(
         edits.tryEmit(Unit)
     }
 
-    fun flush() {
+    fun saveNow() {
         if (!hasUserEdited) return
         persist(alsoSync = true)
     }

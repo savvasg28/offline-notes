@@ -17,7 +17,7 @@ ksp {
 android {
     namespace = "com.savvasg.offlinenotes.data.database"
     defaultConfig {
-        testInstrumentationRunner = "com.savvasg.offlinenotes.data.database.HiltTestRunner"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 }
 
@@ -41,6 +41,4 @@ dependencies {
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.truth)
-    androidTestImplementation(libs.hilt.android.testing)
-    kspAndroidTest(libs.hilt.compiler)
 }

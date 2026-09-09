@@ -49,30 +49,30 @@ class NoteEditorViewModelTest {
     }
 
     @Test
-    fun `flush called twice in a row for the same edit only saves once`() = runTest {
+    fun `saveNow called twice in a row for the same edit only saves once`() = runTest {
         viewModel.onTitleChange("Title")
         viewModel.onBodyChange("Body")
 
-        viewModel.flush()
-        viewModel.flush()
+        viewModel.saveNow()
+        viewModel.saveNow()
 
         coVerify(exactly = 1) { repository.saveNote("note-1", "Title", "Body") }
     }
 
     @Test
-    fun `a fresh edit after a flush is saved again`() = runTest {
+    fun `a fresh edit after a saveNow is saved again`() = runTest {
         viewModel.onTitleChange("Title")
-        viewModel.flush()
+        viewModel.saveNow()
 
         viewModel.onBodyChange("New body")
-        viewModel.flush()
+        viewModel.saveNow()
 
         coVerify(exactly = 2) { repository.saveNote(any(), any(), any()) }
     }
 
     @Test
-    fun `flush with no edits made is a no-op`() = runTest {
-        viewModel.flush()
+    fun `saveNow with no edits made is a no-op`() = runTest {
+        viewModel.saveNow()
 
         coVerify(exactly = 0) { repository.saveNote(any(), any(), any()) }
     }

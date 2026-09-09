@@ -4,7 +4,6 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
-import com.savvasg.offlinenotes.data.database.OfflineNotesDatabase
 import com.savvasg.offlinenotes.domain.model.OpType
 
 @Entity(

@@ -39,6 +39,8 @@ android {
 }
 
 dependencies {
+    lintChecks(libs.compose.lint.checks)
+
     implementation(project(":domain"))
     implementation(project(":data:database"))
     implementation(project(":data:network"))
@@ -66,4 +68,7 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
 
     implementation(libs.hilt.work)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.konsist)
 }

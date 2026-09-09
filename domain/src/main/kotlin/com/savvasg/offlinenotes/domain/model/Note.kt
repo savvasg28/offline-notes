@@ -10,7 +10,7 @@ data class Note(
     val lastUpdated: Long,
 )
 
-data class NoteListItem(
+data class NoteSummary(
     val id: String,
     val title: String,
     val bodySnippet: String,

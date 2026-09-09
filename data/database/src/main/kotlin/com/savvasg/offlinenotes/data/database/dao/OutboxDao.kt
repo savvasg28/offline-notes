@@ -3,7 +3,6 @@ package com.savvasg.offlinenotes.data.database.dao
 import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.Upsert
-import com.savvasg.offlinenotes.data.database.NoteTransactions
 import com.savvasg.offlinenotes.data.database.entity.OutboxEntity
 import com.savvasg.offlinenotes.data.database.entity.OutboxStatus
 import kotlinx.coroutines.flow.Flow
