@@ -4,9 +4,9 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
-import com.savvasg.offlinenotes.core.model.SyncState
-import com.savvasg.offlinenotes.core.domain.ObserveNoteUseCase
-import com.savvasg.offlinenotes.core.domain.SaveNoteEditUseCase
+import com.savvasg.offlinenotes.domain.model.SyncState
+import com.savvasg.offlinenotes.domain.usecase.ObserveNoteUseCase
+import com.savvasg.offlinenotes.domain.usecase.SaveNoteEditUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.NonCancellable

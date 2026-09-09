@@ -7,6 +7,6 @@ android {
 }
 
 dependencies {
-    implementation(project(":core:network"))
+    implementation(project(":domain"))
     implementation(libs.kotlinx.coroutines.core)
 }

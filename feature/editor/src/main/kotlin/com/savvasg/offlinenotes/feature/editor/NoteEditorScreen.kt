@@ -35,7 +35,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.savvasg.offlinenotes.core.designsystem.R as DesignSystemR
-import com.savvasg.offlinenotes.core.model.SyncState
+import com.savvasg.offlinenotes.domain.model.SyncState
 
 @Composable
 fun NoteEditorScreen(

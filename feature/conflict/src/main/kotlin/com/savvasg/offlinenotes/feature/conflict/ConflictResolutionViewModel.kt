@@ -4,9 +4,9 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
-import com.savvasg.offlinenotes.core.model.NoteConflict
-import com.savvasg.offlinenotes.core.domain.ObserveConflictUseCase
-import com.savvasg.offlinenotes.core.domain.ResolveConflictUseCase
+import com.savvasg.offlinenotes.domain.model.NoteConflict
+import com.savvasg.offlinenotes.domain.usecase.ObserveConflictUseCase
+import com.savvasg.offlinenotes.domain.usecase.ResolveConflictUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow

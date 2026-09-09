@@ -6,7 +6,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.Configuration
-import com.savvasg.offlinenotes.core.sync.WorkManagerSyncTrigger
+import com.savvasg.offlinenotes.data.sync.WorkManagerSyncTrigger
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 

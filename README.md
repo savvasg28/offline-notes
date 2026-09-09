@@ -56,80 +56,68 @@ flowchart TD
     fed[":feature:editor"]
     fco[":feature:conflict"]
     cds[":core:designsystem"]
-    cdata[":core:data"]
-    cdom[":core:domain"]
-    csync[":core:sync"]
-    cdb[":core:database"]
-    cnet[":core:network"]
     ctest[":core:testing"]
-    cmodel[":core:model"]
+    dom[":domain"]
+    dat[":data"]
+    ddb[":data:database"]
+    dnet[":data:network"]
+    dsync[":data:sync"]
 
     app --> fnl & fed & fco
-    app --> cdata & cdom & cdb & cnet & cds & csync
-    fnl --> cmodel & cdom & cds
-    fed --> cmodel & cdom & cds
-    fco --> cmodel & cdom & cds
-    csync --> cdata & cdom
-    cdom --> cmodel & cdata & cnet
-    cdata --> cmodel & cdb
-    cdb --> cmodel
-    cnet --> cmodel
-    ctest -.test only.-> cnet
+    app --> dom & dat & ddb & dnet & dsync & cds
+    fnl --> dom & cds
+    fed --> dom & cds
+    fco --> dom & cds
+    dat --> dom & ddb
+    ddb --> dom
+    dnet --> dom
+    dsync --> dom
+    ctest -.test only.-> dom
 ```
 
-Each arrow is `implementation`, not `api` — a module sees only what it directly declares, not
-what its dependencies depend on. `:core:model` is the only module every other module can see; it's
-a plain Kotlin/JVM module with no Android dependency, so it can't smuggle one in by accident.
+Every arrow points at `:domain`, and `:domain` points at nothing. It is a plain
+`kotlin("jvm")` module whose only two external imports, across the whole module, are
+`javax.inject.Inject` and `kotlinx.coroutines.flow.Flow` — no Android, no Room, no Retrofit, no
+serialization. That isn't a convention anyone has to remember: those frameworks are not on its
+compile classpath, so reaching for one is a compile error rather than a review comment.
 
-**`:core:domain` holds all of this app's business logic, not just the use cases.** Six use cases —
-`ObserveNotesUseCase`, `DeleteNoteUseCase`, `ObserveNoteUseCase`, `SaveNoteEditUseCase`,
-`ObserveConflictUseCase`, `ResolveConflictUseCase`, one per ViewModel operation — plus `SyncEngine`,
-the freeze→push→apply→pull orchestration that drains the outbox. `SyncEngine` moved here from a
-separate `:sync:engine` module once nothing else justified keeping it apart: it's pure Kotlin
-orchestrating `NoteSyncOperations` and `SyncTransport`, exactly the same shape as a use case
-orchestrating `NoteRepository` — the only reason it wasn't already here is that it needs
-`:core:network` too, for `Mappers.kt` to convert wire DTOs to domain types. Feature modules depend
-on `:core:domain`, never on `:core:data` directly: no ViewModel in this app sees `NoteRepository`
-or `SyncTrigger`. Most of the use cases are one line forwarding straight to the repository, and
-that's fine — the point of the boundary isn't that every use case must hide complexity, it's that
-callers depend on a stable, testable seam instead of the repository interface itself, so business
-logic has somewhere to grow without ever touching a ViewModel. `SaveNoteEditUseCase` is where that
-already pays for itself: it composes `NoteRepository` and `SyncTrigger` into one policy — persist
-the edit, and only when leaving the editor with something unsynced, ask for an immediate sync
-instead of waiting out the debounce — that the editor ViewModel used to assemble itself, holding
-both dependencies just to sequence them.
+**`:domain` holds the entities, the ports, and the business logic.** `Note`, `NoteConflict` and
+the sync transfer objects in `domain.model`; `NoteRepository` and `NoteSyncOperations` in
+`domain.repository`; `SyncTrigger`, `SyncTransport` and `SyncEngine` in `domain.sync`; and the six
+use cases in `domain.usecase`. The ports are declared here and implemented outward — `:data`
+implements the repositories, `:data:network` implements `SyncTransport`, `:data:sync` implements
+`SyncTrigger` — which is why the dependency arrows run inward rather than out.
 
-Repository *interfaces* (`NoteRepository`, `NoteSyncOperations`, `SyncTrigger`) still live in
-`:core:data`, next to `NoteRepositoryImpl` — not in `:core:domain` — because `:core:domain` depends
-on `:core:data` to call them, and an interface can't live downstream of the module that calls it.
-This is also why `SyncEngine` couldn't have lived here before the WorkManager trigger moved into
-its own module (`:core:sync`, below): the engine needs `NoteSyncOperations` without depending on
-`:core:data`, and `:core:data` used to depend on the engine right back (for the scheduler) — an
-actual cycle, had `:core:domain` sat between them the way it does now.
+`SyncTransport` is stated in the app's own vocabulary (`FrozenOutboxOp`, `OpOutcome`,
+`RemoteChangePage`), not in wire types. `:data:network` owns the JSON shapes, its own
+`WireOpType`, and `Mappers.kt`, which is the single place the two vocabularies meet. A server-side
+rename lands in one file and cannot reach the domain at all.
 
-**`:core:sync` is what's left once the actual sync logic moves out: a WorkManager adapter, nothing
-more.** It holds `SyncWorker` (the `CoroutineWorker`) and `WorkManagerSyncTrigger`, the sole
-implementation of `:core:data`'s `SyncTrigger` interface (`requestSync()` / `requestImmediateSync()`)
-that `NoteRepositoryImpl` and `SaveNoteEditUseCase` call after a write. Neither of those two ever
-depends on `:core:sync`, or even knows WorkManager is the mechanism behind `SyncTrigger` — Hilt
-resolves the binding at `:app`, where both `:core:data` and `:core:sync` are on the classpath
-together. Swapping the trigger mechanism (a different scheduler, a test double) means writing a
-new `SyncTrigger` and touching `:app`'s dependency list — nothing else. This module used to sit at
-the top level, as `:sync:work`, paired with a `:sync:engine` holding the actual algorithm; once
-that algorithm turned out to belong in `:core:domain` (above), the only thing left here is an
-infrastructure adapter behind a domain-defined interface — the same shape as `:core:database`
-(Room behind `NoteRepository`) or `:core:network` (`HttpTransport` behind `SyncTransport`), so it
-belongs under `:core:` the same way they do.
+**`:core:` is only for things that are genuinely reusable and carry no business meaning** —
+`:core:designsystem` (theme, shared strings) and `:core:testing` (`FakeTransport`). The layers are
+named as layers, because that is what they are; an earlier version of this graph put `data`,
+`domain`, `database` and `network` under `:core:` following Google's *Now in Android* sample, but
+NiA shares those across six features and this app has one, so the prefix conveyed nothing.
+
+**Business logic that does *not* live in `:domain`, on purpose.** `NoteTransactions`
+(`:data:database`) holds the pull skip rule, conflict refresh for parked ops, tombstone-vs-local-edit
+resolution, and bootstrap purging. Strict Clean Architecture would place those in the domain layer.
+They stay here because every one of them has to execute inside a single Room transaction to satisfy
+invariant 4, and hoisting them would mean either exposing a transaction scope through the
+repository port — leaking persistence into the domain far more damagingly — or giving up atomicity.
+This is the one place the layering yields to a real constraint, and the cost is honest: that file
+is the least portable code in the repo and is reachable only through Robolectric and a real Room
+instance.
 
 **`:core:testing`** holds `FakeTransport`, a `SyncTransport` test double currently used only by
-`SyncEngineTest`. It's a separate module rather than living inside `:core:domain`'s own test
-sources so the next module that needs a scriptable `SyncTransport` for its own tests has somewhere
-to `testImplementation` it from, rather than depending on another module's test sources (which
-Gradle doesn't expose) or copy-pasting the fake.
+`SyncEngineTest`. It's a separate module rather than living inside `:data`'s own test sources so
+the next module that needs a scriptable `SyncTransport` has somewhere to `testImplementation` it
+from, rather than depending on another module's test sources (which Gradle doesn't expose) or
+copy-pasting the fake.
 
 **This repo owns the client only.** There's no owned reference server implementation: the app is
 a correct client of a wire contract — specified in [`openapi/offline-notes.yaml`](openapi/offline-notes.yaml)
-and typed in [`RemoteDtos.kt`](core/network/src/main/kotlin/com/savvasg/offlinenotes/core/network/dto/RemoteDtos.kt) —
+and typed in [`RemoteDtos.kt`](data/network/src/main/kotlin/com/savvasg/offlinenotes/data/network/dto/RemoteDtos.kt) —
 and whatever answers on the other end of `HttpTransport` — a real backend, or the
 [Mockoon environment](mockoon/) checked in here — is out of scope for what this repo
 demonstrates. The app ships exactly one transport, `HttpTransport`; the base URL comes from a
@@ -232,12 +220,12 @@ same Mockoon instance to watch two devices converge on shared state.
 
 ```bash
 ./gradlew testDebugUnitTest         # 48 tests, across every module that has any
-./gradlew connectedDebugAndroidTest # 4 tests (:core:database), needs a device/emulator
+./gradlew connectedDebugAndroidTest # 4 tests (:data:database), needs a device/emulator
 ```
 
-Unqualified: unit tests live wherever the thing they test lives (`:core:database`,
-`:core:network`, `:core:domain`, `:core:sync`, `:core:data`, `:feature:editor`), not all in
-`:app`, and an unqualified Gradle task name runs in every module that declares it.
+Unqualified: unit tests live wherever the thing they test lives (`:data`, `:data:database`,
+`:data:network`, `:data:sync`, `:feature:editor`), not all in `:app`, and an unqualified Gradle
+task name runs in every module that declares it.
 
 CI (`.github/workflows/ci.yml`) runs both on every push: a plain JVM job for the unit tests, and a
 `reactivecircus/android-emulator-runner` job for the instrumented ones.

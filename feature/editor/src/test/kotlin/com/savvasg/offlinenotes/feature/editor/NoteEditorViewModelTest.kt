@@ -2,11 +2,11 @@ package com.savvasg.offlinenotes.feature.editor
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.navigation.testing.invoke
-import com.savvasg.offlinenotes.core.model.Note
-import com.savvasg.offlinenotes.core.data.NoteRepository
-import com.savvasg.offlinenotes.core.data.SyncTrigger
-import com.savvasg.offlinenotes.core.domain.ObserveNoteUseCase
-import com.savvasg.offlinenotes.core.domain.SaveNoteEditUseCase
+import com.savvasg.offlinenotes.domain.model.Note
+import com.savvasg.offlinenotes.domain.repository.NoteRepository
+import com.savvasg.offlinenotes.domain.sync.SyncTrigger
+import com.savvasg.offlinenotes.domain.usecase.ObserveNoteUseCase
+import com.savvasg.offlinenotes.domain.usecase.SaveNoteEditUseCase
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk

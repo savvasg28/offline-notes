@@ -39,13 +39,12 @@ android {
 }
 
 dependencies {
-    implementation(project(":core:model"))
-    implementation(project(":core:database"))
-    implementation(project(":core:network"))
-    implementation(project(":core:data"))
-    implementation(project(":core:domain"))
+    implementation(project(":domain"))
+    implementation(project(":data:database"))
+    implementation(project(":data:network"))
+    implementation(project(":data"))
     implementation(project(":core:designsystem"))
-    implementation(project(":core:sync"))
+    implementation(project(":data:sync"))
     implementation(project(":feature:notelist"))
     implementation(project(":feature:editor"))
     implementation(project(":feature:conflict"))

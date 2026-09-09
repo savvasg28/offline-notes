@@ -1,34 +1,36 @@
 package com.savvasg.offlinenotes.core.testing
 
-import com.savvasg.offlinenotes.core.network.SyncTransport
-import com.savvasg.offlinenotes.core.network.dto.AuthFailureException
-import com.savvasg.offlinenotes.core.network.dto.DeltaPage
-import com.savvasg.offlinenotes.core.network.dto.OpResult
-import com.savvasg.offlinenotes.core.network.dto.OutgoingOp
+import com.savvasg.offlinenotes.domain.model.ConflictPayload
+import com.savvasg.offlinenotes.domain.model.FrozenOutboxOp
+import com.savvasg.offlinenotes.domain.sync.AuthFailureException
+import com.savvasg.offlinenotes.domain.sync.OpOutcome
+import com.savvasg.offlinenotes.domain.sync.RemoteChangePage
+import com.savvasg.offlinenotes.domain.sync.SyncTransport
 import java.util.concurrent.atomic.AtomicLong
 
 class FakeTransport : SyncTransport {
 
     private val versionCounter = AtomicLong(0)
     private var forcedException: (() -> Nothing)? = null
-    private val conflictOverrideByNoteId = mutableMapOf<String, OpResult.Conflict>()
-    private var nextPullPage: DeltaPage? = null
+    private val conflictOverrideByNoteId = mutableMapOf<String, ConflictPayload>()
+    private var nextPullPage: RemoteChangePage? = null
 
-    override suspend fun pushOps(ops: List<OutgoingOp>): List<OpResult> {
+    override suspend fun pushOps(ops: List<FrozenOutboxOp>): List<OpOutcome> {
         throwForcedIfQueued()
         return ops.map { op ->
-            conflictOverrideByNoteId.remove(op.noteId)?.copy(opId = op.opId)
-                ?: OpResult.Applied(op.opId, versionCounter.incrementAndGet().toString())
+            conflictOverrideByNoteId.remove(op.noteId)
+                ?.let { OpOutcome.Conflicted(op.opId, it) }
+                ?: OpOutcome.Applied(op.opId, versionCounter.incrementAndGet().toString())
         }
     }
 
-    override suspend fun pullDelta(since: String?): DeltaPage {
+    override suspend fun pullDelta(since: String?): RemoteChangePage {
         throwForcedIfQueued()
         nextPullPage?.let {
             nextPullPage = null
             return it
         }
-        return DeltaPage(notes = emptyList(), nextSyncToken = since ?: "0", hasMore = false)
+        return RemoteChangePage(notes = emptyList(), nextSyncToken = since ?: "0", hasMore = false)
     }
 
     private fun throwForcedIfQueued() {
@@ -43,8 +45,7 @@ class FakeTransport : SyncTransport {
         remoteTitle: String = "Edited elsewhere",
         remoteBody: String = "This edit came from another device.",
     ) {
-        conflictOverrideByNoteId[noteId] = OpResult.Conflict(
-            opId = "",
+        conflictOverrideByNoteId[noteId] = ConflictPayload(
             baseVersion = null,
             baseTitle = null,
             baseBody = null,
@@ -58,7 +59,7 @@ class FakeTransport : SyncTransport {
         forcedException = { throw AuthFailureException() }
     }
 
-    fun queueNextPullPage(page: DeltaPage) {
+    fun queueNextPullPage(page: RemoteChangePage) {
         nextPullPage = page
     }
 }

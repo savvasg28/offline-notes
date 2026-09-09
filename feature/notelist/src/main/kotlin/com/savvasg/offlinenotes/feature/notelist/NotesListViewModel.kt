@@ -2,9 +2,9 @@ package com.savvasg.offlinenotes.feature.notelist
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.savvasg.offlinenotes.core.model.NoteListItem
-import com.savvasg.offlinenotes.core.domain.DeleteNoteUseCase
-import com.savvasg.offlinenotes.core.domain.ObserveNotesUseCase
+import com.savvasg.offlinenotes.domain.model.NoteListItem
+import com.savvasg.offlinenotes.domain.usecase.DeleteNoteUseCase
+import com.savvasg.offlinenotes.domain.usecase.ObserveNotesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.UUID
 import javax.inject.Inject
