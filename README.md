@@ -58,21 +58,19 @@ flowchart TD
     cds[":core:designsystem"]
     cdata[":core:data"]
     cdom[":core:domain"]
-    sengine[":sync:engine"]
-    swork[":sync:work"]
+    csync[":core:sync"]
     cdb[":core:database"]
     cnet[":core:network"]
     ctest[":core:testing"]
     cmodel[":core:model"]
 
     app --> fnl & fed & fco
-    app --> cdata & cdom & cdb & cnet & cds & swork
+    app --> cdata & cdom & cdb & cnet & cds & csync
     fnl --> cmodel & cdom & cds
     fed --> cmodel & cdom & cds
     fco --> cmodel & cdom & cds
-    cdom --> cmodel & cdata
-    swork --> cdata & sengine
-    sengine --> cmodel & cdata & cnet
+    csync --> cdata & cdom
+    cdom --> cmodel & cdata & cnet
     cdata --> cmodel & cdb
     cdb --> cmodel
     cnet --> cmodel
@@ -83,45 +81,48 @@ Each arrow is `implementation`, not `api` — a module sees only what it directl
 what its dependencies depend on. `:core:model` is the only module every other module can see; it's
 a plain Kotlin/JVM module with no Android dependency, so it can't smuggle one in by accident.
 
-**`:core:domain` is where the use cases live** — `ObserveNotesUseCase`, `DeleteNoteUseCase`,
-`ObserveNoteUseCase`, `SaveNoteEditUseCase`, `ObserveConflictUseCase`, `ResolveConflictUseCase` —
-one per ViewModel operation. Feature modules depend on `:core:domain`, never on `:core:data`
-directly: no ViewModel in this app sees `NoteRepository` or `SyncTrigger`. Most of these use cases
-are one line forwarding straight to the repository, and that's fine — the point of the boundary
-isn't that every use case must hide complexity, it's that ViewModels depend on a stable, testable
-seam instead of the repository interface itself, so business logic has somewhere to grow without
-ever touching a ViewModel. `SaveNoteEditUseCase` is where that already pays for itself: it's the
-one place in the app composing two collaborators (`NoteRepository` and `SyncTrigger`) into one
-policy — "persist the edit, and only when leaving the editor with something unsynced, ask for an
-immediate sync instead of waiting out the debounce" — that the editor ViewModel used to assemble
-itself, holding both dependencies just to sequence them.
+**`:core:domain` holds all of this app's business logic, not just the use cases.** Six use cases —
+`ObserveNotesUseCase`, `DeleteNoteUseCase`, `ObserveNoteUseCase`, `SaveNoteEditUseCase`,
+`ObserveConflictUseCase`, `ResolveConflictUseCase`, one per ViewModel operation — plus `SyncEngine`,
+the freeze→push→apply→pull orchestration that drains the outbox. `SyncEngine` moved here from a
+separate `:sync:engine` module once nothing else justified keeping it apart: it's pure Kotlin
+orchestrating `NoteSyncOperations` and `SyncTransport`, exactly the same shape as a use case
+orchestrating `NoteRepository` — the only reason it wasn't already here is that it needs
+`:core:network` too, for `Mappers.kt` to convert wire DTOs to domain types. Feature modules depend
+on `:core:domain`, never on `:core:data` directly: no ViewModel in this app sees `NoteRepository`
+or `SyncTrigger`. Most of the use cases are one line forwarding straight to the repository, and
+that's fine — the point of the boundary isn't that every use case must hide complexity, it's that
+callers depend on a stable, testable seam instead of the repository interface itself, so business
+logic has somewhere to grow without ever touching a ViewModel. `SaveNoteEditUseCase` is where that
+already pays for itself: it composes `NoteRepository` and `SyncTrigger` into one policy — persist
+the edit, and only when leaving the editor with something unsynced, ask for an immediate sync
+instead of waiting out the debounce — that the editor ViewModel used to assemble itself, holding
+both dependencies just to sequence them.
 
 Repository *interfaces* (`NoteRepository`, `NoteSyncOperations`, `SyncTrigger`) still live in
 `:core:data`, next to `NoteRepositoryImpl` — not in `:core:domain` — because `:core:domain` depends
 on `:core:data` to call them, and an interface can't live downstream of the module that calls it.
-This is also why `:core:domain` couldn't have existed before the WorkManager trigger moved into
-its own module (`:sync:work`, below): the sync engine needs `NoteSyncOperations` without depending
-on `:core:data`, and `:core:data` used to depend on the sync engine right back (for the scheduler)
-— an actual cycle, had `:core:domain` sat between them the way it does now.
+This is also why `SyncEngine` couldn't have lived here before the WorkManager trigger moved into
+its own module (`:core:sync`, below): the engine needs `NoteSyncOperations` without depending on
+`:core:data`, and `:core:data` used to depend on the engine right back (for the scheduler) — an
+actual cycle, had `:core:domain` sat between them the way it does now.
 
-**`:sync:engine` and `:sync:work` are two modules, both under `:sync:`, for one reason: WorkManager.**
-`:sync:engine` (`SyncEngine`, the freeze→push→apply→pull orchestration) depends only on
-`:core:data` and `:core:network` — no Android framework dependency beyond what those already
-carry. `:sync:work` is the only module that knows WorkManager exists: it holds `SyncWorker`
-(the `CoroutineWorker`) and `WorkManagerSyncTrigger`, the sole implementation of `:core:data`'s
-`SyncTrigger` interface (`requestSync()` / `requestImmediateSync()`) that `NoteRepositoryImpl` and
-`SaveNoteEditUseCase` call after a write. Neither of those two ever depends on `:sync:work`, or
-even knows WorkManager is the mechanism behind `SyncTrigger` — Hilt resolves the binding at
-`:app`, where both `:core:data` and `:sync:work` are on the classpath together. Swapping the
-trigger mechanism (a different scheduler, a test double) means writing a new `SyncTrigger` and
-touching `:app`'s dependency list — nothing else. Both modules sit under `:sync:`, not `:core:`,
-because sync is a vertical subsystem with its own two-part shape (portable engine, platform
-trigger) — `:core:` is reserved for foundational pieces (model, database, network, data,
-designsystem, testing) that any feature might depend on directly, not for a subsystem that
-happens to have a small piece.
+**`:core:sync` is what's left once the actual sync logic moves out: a WorkManager adapter, nothing
+more.** It holds `SyncWorker` (the `CoroutineWorker`) and `WorkManagerSyncTrigger`, the sole
+implementation of `:core:data`'s `SyncTrigger` interface (`requestSync()` / `requestImmediateSync()`)
+that `NoteRepositoryImpl` and `SaveNoteEditUseCase` call after a write. Neither of those two ever
+depends on `:core:sync`, or even knows WorkManager is the mechanism behind `SyncTrigger` — Hilt
+resolves the binding at `:app`, where both `:core:data` and `:core:sync` are on the classpath
+together. Swapping the trigger mechanism (a different scheduler, a test double) means writing a
+new `SyncTrigger` and touching `:app`'s dependency list — nothing else. This module used to sit at
+the top level, as `:sync:work`, paired with a `:sync:engine` holding the actual algorithm; once
+that algorithm turned out to belong in `:core:domain` (above), the only thing left here is an
+infrastructure adapter behind a domain-defined interface — the same shape as `:core:database`
+(Room behind `NoteRepository`) or `:core:network` (`HttpTransport` behind `SyncTransport`), so it
+belongs under `:core:` the same way they do.
 
 **`:core:testing`** holds `FakeTransport`, a `SyncTransport` test double currently used only by
-`SyncEngineTest`. It's a separate module rather than living inside `:sync:engine`'s own test
+`SyncEngineTest`. It's a separate module rather than living inside `:core:domain`'s own test
 sources so the next module that needs a scriptable `SyncTransport` for its own tests has somewhere
 to `testImplementation` it from, rather than depending on another module's test sources (which
 Gradle doesn't expose) or copy-pasting the fake.
@@ -235,7 +236,7 @@ same Mockoon instance to watch two devices converge on shared state.
 ```
 
 Unqualified: unit tests live wherever the thing they test lives (`:core:database`,
-`:core:network`, `:sync:engine`, `:sync:work`, `:core:data`, `:feature:editor`), not all in
+`:core:network`, `:core:domain`, `:core:sync`, `:core:data`, `:feature:editor`), not all in
 `:app`, and an unqualified Gradle task name runs in every module that declares it.
 
 CI (`.github/workflows/ci.yml`) runs both on every push: a plain JVM job for the unit tests, and a

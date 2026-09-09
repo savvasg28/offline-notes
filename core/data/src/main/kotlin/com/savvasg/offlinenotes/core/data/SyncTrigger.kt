@@ -2,7 +2,7 @@ package com.savvasg.offlinenotes.core.data
 
 /**
  * The "please sync soon" contract, kept independent of whatever actually schedules the work
- * (WorkManager today) so this module never depends on it — see :sync:work for the implementation.
+ * (WorkManager today) so this module never depends on it — see :core:sync for the implementation.
  */
 interface SyncTrigger {
     /** Eventual, debounced: called after every local write. */
