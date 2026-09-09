@@ -11,8 +11,8 @@ import retrofit2.http.Query
 
 interface OfflineNotesApi {
     @POST("push")
-    suspend fun pushOps(@Body ops: List<OutgoingOp>): Response<List<OpResult>>
+    suspend fun push(@Body ops: List<OutgoingOp>): Response<List<OpResult>>
 
     @GET("pull")
-    suspend fun pullDelta(@Query("since") since: String?): Response<DeltaPage>
+    suspend fun pull(@Query("since") since: String?): Response<DeltaPage>
 }

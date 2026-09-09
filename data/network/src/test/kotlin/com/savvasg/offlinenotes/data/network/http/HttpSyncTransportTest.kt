@@ -19,10 +19,10 @@ import org.junit.Test
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 
-class HttpTransportTest {
+class HttpSyncTransportTest {
 
     private lateinit var server: MockWebServer
-    private lateinit var transport: HttpTransport
+    private lateinit var transport: HttpSyncTransport
 
     @Before
     fun setUp() {
@@ -33,7 +33,7 @@ class HttpTransportTest {
             .baseUrl(server.url("/"))
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
-        transport = HttpTransport(retrofit.create(OfflineNotesApi::class.java))
+        transport = HttpSyncTransport(retrofit.create(OfflineNotesApi::class.java))
     }
 
     @After
@@ -47,7 +47,7 @@ class HttpTransportTest {
     private fun createOp() = FrozenOutboxOp("op-1", "note-1", OpType.CREATE, baseVersion = null, title = "T", body = "B")
 
     @Test
-    fun `pushOps serializes the request and deserializes an Applied result`() = runTest {
+    fun `push serializes the request and deserializes an Applied result`() = runTest {
         server.enqueue(
             MockResponse()
                 .setResponseCode(200)
@@ -55,7 +55,7 @@ class HttpTransportTest {
                 .setHeader("Content-Type", "application/json"),
         )
 
-        val results = transport.pushOps(listOf(createOp()))
+        val results = transport.push(listOf(createOp()))
 
         assertThat(results.single()).isEqualTo(OpOutcome.Applied("op-1", "1"))
         val sentBody = server.takeRequest().body.readUtf8()
@@ -65,7 +65,7 @@ class HttpTransportTest {
     }
 
     @Test
-    fun `pullDelta deserializes a DeltaPage`() = runTest {
+    fun `pull deserializes a DeltaPage`() = runTest {
         server.enqueue(
             MockResponse()
                 .setResponseCode(200)
@@ -73,7 +73,7 @@ class HttpTransportTest {
                 .setHeader("Content-Type", "application/json"),
         )
 
-        val page = transport.pullDelta(since = "1")
+        val page = transport.pull(since = "1")
 
         assertThat(page.nextSyncToken).isEqualTo("5")
         assertThat(page.hasMore).isFalse()
@@ -84,7 +84,7 @@ class HttpTransportTest {
     fun `401 maps to AuthFailureException`() = runTest {
         server.enqueue(MockResponse().setResponseCode(401))
         try {
-            transport.pushOps(listOf(createOp()))
+            transport.push(listOf(createOp()))
             throw AssertionError("expected AuthFailureException")
         } catch (expected: AuthFailureException) {
         }
@@ -94,7 +94,7 @@ class HttpTransportTest {
     fun `429 maps to RateLimitException`() = runTest {
         server.enqueue(MockResponse().setResponseCode(429))
         try {
-            transport.pushOps(listOf(createOp()))
+            transport.push(listOf(createOp()))
             throw AssertionError("expected RateLimitException")
         } catch (expected: RateLimitException) {
         }
@@ -104,7 +104,7 @@ class HttpTransportTest {
     fun `410 on pull maps to SyncTokenExpiredException`() = runTest {
         server.enqueue(MockResponse().setResponseCode(410))
         try {
-            transport.pullDelta(since = "1")
+            transport.pull(since = "1")
             throw AssertionError("expected SyncTokenExpiredException")
         } catch (expected: SyncTokenExpiredException) {
         }
@@ -114,7 +114,7 @@ class HttpTransportTest {
     fun `500 maps to NetworkException - a whole-batch-retry signal`() = runTest {
         server.enqueue(MockResponse().setResponseCode(500))
         try {
-            transport.pushOps(listOf(createOp()))
+            transport.push(listOf(createOp()))
             throw AssertionError("expected NetworkException")
         } catch (expected: NetworkException) {
         }
@@ -124,7 +124,7 @@ class HttpTransportTest {
     fun `a dropped connection maps to NetworkException rather than an unhandled IOException`() = runTest {
         server.shutdown()
         try {
-            transport.pushOps(listOf(createOp()))
+            transport.push(listOf(createOp()))
             throw AssertionError("expected NetworkException")
         } catch (expected: NetworkException) {
         }

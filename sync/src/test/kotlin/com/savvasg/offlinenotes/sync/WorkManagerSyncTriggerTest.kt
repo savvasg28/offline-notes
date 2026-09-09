@@ -47,8 +47,8 @@ class WorkManagerSyncTriggerTest {
     }
 
     @Test
-    fun `schedulePeriodicBackstop is safe to call on every app start`() {
-        repeat(3) { syncTrigger.schedulePeriodicBackstop() }
+    fun `ensurePeriodicSync is safe to call on every app start`() {
+        repeat(3) { syncTrigger.ensurePeriodicSync() }
 
         val infos = workManager.getWorkInfosForUniqueWork(WorkManagerSyncTrigger.SYNC_PERIODIC_WORK_NAME).get()
 
@@ -58,7 +58,7 @@ class WorkManagerSyncTriggerTest {
     @Test
     fun `debounced and periodic work are tracked under separate unique names`() {
         syncTrigger.requestSync()
-        syncTrigger.schedulePeriodicBackstop()
+        syncTrigger.ensurePeriodicSync()
 
         assertThat(workManager.getWorkInfosForUniqueWork(WorkManagerSyncTrigger.SYNC_WORK_NAME).get()).hasSize(1)
         assertThat(workManager.getWorkInfosForUniqueWork(WorkManagerSyncTrigger.SYNC_PERIODIC_WORK_NAME).get()).hasSize(1)

@@ -42,7 +42,7 @@ flowchart LR
         Engine["SyncEngine"] -- "drains" --> Repo
         Work["WorkManager\n(WorkManagerSyncTrigger / SyncWorker)"] --> Engine
         Engine --> Transport["SyncTransport"]
-        Transport --> Http["HttpTransport"]
+        Transport --> Http["HttpSyncTransport"]
     end
     Http -. "real HTTP" .-> Backend["Mockoon\n(or any real server)"]
 ```
@@ -56,23 +56,21 @@ flowchart TD
     fed[":feature:editor"]
     fco[":feature:conflict"]
     cds[":core:designsystem"]
-    ctest[":core:testing"]
     dom[":domain"]
     dat[":data"]
     ddb[":data:database"]
     dnet[":data:network"]
-    dsync[":data:sync"]
+    sync[":sync"]
 
     app --> fnl & fed & fco
-    app --> dom & dat & ddb & dnet & dsync & cds
+    app --> dom & dat & ddb & dnet & sync & cds
     fnl --> dom & cds
     fed --> dom & cds
     fco --> dom & cds
     dat --> dom & ddb
     ddb --> dom
     dnet --> dom
-    dsync --> dom
-    ctest -.test only.-> dom
+    sync --> dom
 ```
 
 Every arrow points at `:domain`, and `:domain` points at nothing. It is a plain
@@ -85,7 +83,7 @@ compile classpath, so reaching for one is a compile error rather than a review c
 the sync transfer objects in `domain.model`; `NoteRepository` and `NoteSyncOperations` in
 `domain.repository`; `SyncTrigger`, `SyncTransport` and `SyncEngine` in `domain.sync`; and the six
 use cases in `domain.usecase`. The ports are declared here and implemented outward — `:data`
-implements the repositories, `:data:network` implements `SyncTransport`, `:data:sync` implements
+implements the repositories, `:data:network` implements `SyncTransport`, `:sync` implements
 `SyncTrigger` — which is why the dependency arrows run inward rather than out.
 
 `SyncTransport` is stated in the app's own vocabulary (`FrozenOutboxOp`, `OpOutcome`,
@@ -94,7 +92,7 @@ implements the repositories, `:data:network` implements `SyncTransport`, `:data:
 rename lands in one file and cannot reach the domain at all.
 
 **`:core:` is only for things that are genuinely reusable and carry no business meaning** —
-`:core:designsystem` (theme, shared strings) and `:core:testing` (`FakeTransport`). The layers are
+which currently means `:core:designsystem` alone (theme, tokens, components). The layers are
 named as layers, because that is what they are; an earlier version of this graph put `data`,
 `domain`, `database` and `network` under `:core:` following Google's *Now in Android* sample, but
 NiA shares those across six features and this app has one, so the prefix conveyed nothing.
@@ -109,18 +107,21 @@ This is the one place the layering yields to a real constraint, and the cost is 
 is the least portable code in the repo and is reachable only through Robolectric and a real Room
 instance.
 
-**`:core:testing`** holds `FakeTransport`, a `SyncTransport` test double currently used only by
-`SyncEngineTest`. It's a separate module rather than living inside `:data`'s own test sources so
-the next module that needs a scriptable `SyncTransport` has somewhere to `testImplementation` it
-from, rather than depending on another module's test sources (which Gradle doesn't expose) or
-copy-pasting the fake.
+**`:sync` is a WorkManager adapter, not a data source** — `SyncWorker` and
+`WorkManagerSyncTrigger`, the only implementation of `SyncTrigger`. It sits beside `:data` rather
+than inside it because nesting it under `:data` implied it was one.
+
+`FakeTransport`, the scriptable `SyncTransport` used by `SyncEngineTest`, lives in `:data`'s own
+test source set. It is scaffolding for one module's tests, not a shared module: the HTTP-level
+scenarios (Applied, Conflict, Rejected, 401, 429, 410) are covered by the
+[Mockoon environment](mockoon/) instead.
 
 **This repo owns the client only.** There's no owned reference server implementation: the app is
 a correct client of a wire contract — specified in [`openapi/offline-notes.yaml`](openapi/offline-notes.yaml)
 and typed in [`RemoteDtos.kt`](data/network/src/main/kotlin/com/savvasg/offlinenotes/data/network/dto/RemoteDtos.kt) —
-and whatever answers on the other end of `HttpTransport` — a real backend, or the
+and whatever answers on the other end of `HttpSyncTransport` — a real backend, or the
 [Mockoon environment](mockoon/) checked in here — is out of scope for what this repo
-demonstrates. The app ships exactly one transport, `HttpTransport`; the base URL comes from a
+demonstrates. The app ships exactly one transport, `HttpSyncTransport`; the base URL comes from a
 per-build-type `BuildConfig.API_BASE_URL`, so there is nothing to switch at runtime.
 
 **One repository implementation behind two interfaces.** `NoteRepository` is UI-facing
@@ -185,7 +186,7 @@ is an ordinary `UPDATE` op with the same idempotency and CAS as any other write.
 | Connectivity regained | Free — the queued work's network constraint fires. |
 | Editor close / app background | Expedited, no delay. Flushes the session tail. |
 | App foreground | Delta pull. Primary freshness mechanism. |
-| Periodic | Long-interval backstop only (≥ 6h). |
+| Periodic | Long-interval backstop only (≥ 6h) — `ensurePeriodicSync()`. |
 
 **W is the bounded data-loss window** — the maximum span of typing that exists on one device
 only — named as such in [`WorkManagerSyncTrigger`](sync/work/src/main/kotlin/com/savvasg/offlinenotes/sync/work/WorkManagerSyncTrigger.kt).
@@ -199,7 +200,7 @@ correctness.
 
 ## Run the hard cases yourself
 
-The failure paths are driven from the server side, by whatever `HttpTransport` is pointed at.
+The failure paths are driven from the server side, by whatever `HttpSyncTransport` is pointed at.
 [`mockoon/offline-notes.json`](mockoon/) is a starter environment implementing the wire contract:
 
 ```bash
@@ -224,7 +225,7 @@ same Mockoon instance to watch two devices converge on shared state.
 ```
 
 Unqualified: unit tests live wherever the thing they test lives (`:data`, `:data:database`,
-`:data:network`, `:data:sync`, `:feature:editor`), not all in `:app`, and an unqualified Gradle
+`:data:network`, `:sync`, `:feature:notelist`, `:feature:editor`), not all in `:app`, and an unqualified Gradle
 task name runs in every module that declares it.
 
 CI (`.github/workflows/ci.yml`) runs both on every push: a plain JVM job for the unit tests, and a
@@ -247,7 +248,7 @@ Named scenario tests, each corresponding to a real defect found while designing 
 | `long_editing_session_produces_one_request_per_window` | `WorkManagerSyncTriggerTest` | 20 debounced schedule calls collapse to one `ENQUEUED` work item. |
 | FTS DAO tests | `NoteDaoFtsTest` (instrumented) | Search matches title/body, excludes deleted notes, reflects updates. |
 
-Plus `HttpTransportTest` (7 tests, MockWebServer: serialization, status-code → exception mapping)
+Plus `HttpSyncTransportTest` (7 tests, MockWebServer: serialization, status-code → exception mapping)
 and `BuildFtsMatchQueryTest` (6 tests: the FTS5 query-injection-safe prefix-match builder).
 
 Since this repo doesn't own backend semantics, `crash_between_send_and_ack_replays_safely` and
@@ -277,7 +278,7 @@ in-process by the fake transport and wrapped in Ktor routes for a real-HTTP demo
 scope creep for what this repo is actually meant to demonstrate: an offline-first *client*. Real
 products don't get to invent their own backend semantics to match their client's convenience —
 the client has to be correct against whatever contract the backend team actually ships, which is
-exactly what `HttpTransport` + a Mockoon-mocked (or genuinely real) server represents. The cost:
+exactly what `HttpSyncTransport` + a Mockoon-mocked (or genuinely real) server represents. The cost:
 the test double can no longer fake real CAS/conflict detection on its own, so scenario tests now
 script the exact response each case needs (`forceConflictOnNextPush`, `queueNextPullPage`)
 instead of driving real server-side state — arguably a clearer signal of what's actually being

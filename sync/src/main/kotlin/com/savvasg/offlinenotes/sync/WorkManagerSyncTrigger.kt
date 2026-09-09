@@ -40,7 +40,7 @@ class WorkManagerSyncTrigger @Inject constructor(private val workManager: WorkMa
         workManager.enqueueUniqueWork(SYNC_WORK_NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
     }
 
-    fun schedulePeriodicBackstop() {
+    fun ensurePeriodicSync() {
         val request =
             PeriodicWorkRequestBuilder<SyncWorker>(
                 PERIODIC_INTERVAL_HOURS,

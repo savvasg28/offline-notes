@@ -22,14 +22,14 @@ class SyncEngine @Inject constructor(
         val frozen = syncOperations.freezeAndDrain()
         if (frozen.isNotEmpty()) {
             val outcomes = try {
-                transport.pushOps(frozen)
+                transport.push(frozen)
             } catch (ignored: TransportException) {
                 return SyncOutcome.TransportFailure
             }
             applyOutcomes(outcomes)
         }
 
-        pullDelta()
+        drainRemoteChanges()
 
         return if (syncOperations.hasPendingOps()) SyncOutcome.MoreWorkPending else SyncOutcome.Done
     }
@@ -44,11 +44,11 @@ class SyncEngine @Inject constructor(
         }
     }
 
-    private suspend fun pullDelta() {
+    private suspend fun drainRemoteChanges() {
         var since = syncOperations.currentSyncToken()
         while (true) {
             val page = try {
-                transport.pullDelta(since)
+                transport.pull(since)
             } catch (ignored: SyncTokenExpiredException) {
                 bootstrap()
                 return
@@ -62,7 +62,7 @@ class SyncEngine @Inject constructor(
     private suspend fun bootstrap() {
         var since: String? = null
         while (true) {
-            val page = transport.pullDelta(since)
+            val page = transport.pull(since)
             syncOperations.applyBootstrap(page.notes, page.nextSyncToken)
             if (!page.hasMore) return
             since = page.nextSyncToken

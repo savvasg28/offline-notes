@@ -15,7 +15,7 @@ class FakeTransport : SyncTransport {
     private val conflictOverrideByNoteId = mutableMapOf<String, ConflictPayload>()
     private var nextPullPage: RemoteChangePage? = null
 
-    override suspend fun pushOps(ops: List<FrozenOutboxOp>): List<OpOutcome> {
+    override suspend fun push(ops: List<FrozenOutboxOp>): List<OpOutcome> {
         throwForcedIfQueued()
         return ops.map { op ->
             conflictOverrideByNoteId.remove(op.noteId)
@@ -24,7 +24,7 @@ class FakeTransport : SyncTransport {
         }
     }
 
-    override suspend fun pullDelta(since: String?): RemoteChangePage {
+    override suspend fun pull(since: String?): RemoteChangePage {
         throwForcedIfQueued()
         nextPullPage?.let {
             nextPullPage = null

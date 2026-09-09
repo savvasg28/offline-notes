@@ -5,9 +5,9 @@ import com.savvasg.offlinenotes.domain.model.FrozenOutboxOp
 import com.savvasg.offlinenotes.domain.model.RemoteNoteChange
 
 interface SyncTransport {
-    suspend fun pushOps(ops: List<FrozenOutboxOp>): List<OpOutcome>
+    suspend fun push(ops: List<FrozenOutboxOp>): List<OpOutcome>
 
-    suspend fun pullDelta(since: String?): RemoteChangePage
+    suspend fun pull(since: String?): RemoteChangePage
 }
 
 sealed interface OpOutcome {

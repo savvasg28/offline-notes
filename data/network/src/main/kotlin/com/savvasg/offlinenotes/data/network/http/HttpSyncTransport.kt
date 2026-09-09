@@ -18,14 +18,14 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class HttpTransport @Inject constructor(private val api: OfflineNotesApi) : SyncTransport {
+class HttpSyncTransport @Inject constructor(private val api: OfflineNotesApi) : SyncTransport {
 
-    override suspend fun pushOps(ops: List<FrozenOutboxOp>): List<OpOutcome> =
-        unwrap(runCatchingIo { api.pushOps(ops.map { it.toOutgoingOp() }) })
+    override suspend fun push(ops: List<FrozenOutboxOp>): List<OpOutcome> =
+        unwrap(runCatchingIo { api.push(ops.map { it.toOutgoingOp() }) })
             .map(OpResult::toOpOutcome)
 
-    override suspend fun pullDelta(since: String?): RemoteChangePage =
-        unwrap(runCatchingIo { api.pullDelta(since) }, isPull = true).toRemoteChangePage()
+    override suspend fun pull(since: String?): RemoteChangePage =
+        unwrap(runCatchingIo { api.pull(since) }, isPull = true).toRemoteChangePage()
 
     private suspend fun <T> runCatchingIo(call: suspend () -> Response<T>): Response<T> = try {
         call()

@@ -74,7 +74,7 @@ class SyncEngineTest {
 
         val frozen = repository.freezeAndDrain()
         val opId = frozen.single().opId
-        val pushed = transport.pushOps(frozen)
+        val pushed = transport.push(frozen)
         assertThat(pushed.single()).isInstanceOf(OpOutcome.Applied::class.java)
 
         assertThat(db.outboxDao().getById(opId)!!.status).isEqualTo(OutboxStatus.IN_FLIGHT)

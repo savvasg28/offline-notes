@@ -34,7 +34,7 @@ servers:
 paths:
   /push:
     post:
-      operationId: pushOps
+      operationId: push
       summary: Submit a frozen batch of outbox operations.
       description: |
         Sent once per sync round, after the client has frozen its outbox. The response array must
@@ -106,7 +106,7 @@ paths:
 
   /pull:
     get:
-      operationId: pullDelta
+      operationId: pull
       summary: Fetch one page of changes since a cursor.
       description: |
         Omitting `since` requests a bootstrap: a full current-state snapshot rather than a delta.

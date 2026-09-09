@@ -27,7 +27,7 @@ class OfflineNotesApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
 
-        syncTrigger.schedulePeriodicBackstop()
+        syncTrigger.ensurePeriodicSync()
 
         ProcessLifecycleOwner.get().lifecycle.addObserver(
             object : DefaultLifecycleObserver {
