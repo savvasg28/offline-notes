@@ -92,8 +92,8 @@ class NoteRepositoryImpl @Inject constructor(
         transactions.applyDelta(remoteNotes, newSyncToken, now = System.currentTimeMillis())
     }
 
-    override suspend fun applyBootstrap(remoteNotes: List<RemoteNoteChange>, newSyncToken: String) {
-        transactions.applyBootstrap(remoteNotes, newSyncToken, now = System.currentTimeMillis())
+    override suspend fun applySnapshot(remoteNotes: List<RemoteNoteChange>, newSyncToken: String) {
+        transactions.applySnapshot(remoteNotes, newSyncToken, now = System.currentTimeMillis())
     }
 
     override suspend fun resetStaleInFlight() {

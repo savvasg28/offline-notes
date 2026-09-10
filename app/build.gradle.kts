@@ -6,6 +6,10 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+composeCompiler {
+    stabilityConfigurationFiles.add(rootProject.layout.projectDirectory.file("config/compose/stability.conf"))
+}
+
 android {
     namespace = "com.savvasg.offlinenotes"
 

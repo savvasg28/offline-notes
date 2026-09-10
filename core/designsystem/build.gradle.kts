@@ -3,6 +3,12 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+composeCompiler {
+    stabilityConfigurationFiles.add(rootProject.layout.projectDirectory.file("config/compose/stability.conf"))
+    reportsDestination.set(layout.buildDirectory.dir("compose-reports"))
+    metricsDestination.set(layout.buildDirectory.dir("compose-reports"))
+}
+
 android {
     namespace = "com.savvasg.offlinenotes.core.designsystem"
 

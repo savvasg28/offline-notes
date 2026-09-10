@@ -18,7 +18,7 @@ interface NoteSyncOperations {
 
     suspend fun applyDelta(remoteNotes: List<RemoteNoteChange>, newSyncToken: String)
 
-    suspend fun applyBootstrap(remoteNotes: List<RemoteNoteChange>, newSyncToken: String)
+    suspend fun applySnapshot(remoteNotes: List<RemoteNoteChange>, newSyncToken: String)
 
     suspend fun resetStaleInFlight()
 

@@ -50,7 +50,7 @@ class SyncEngine @Inject constructor(
             val page = try {
                 transport.pull(since)
             } catch (ignored: SyncTokenExpiredException) {
-                bootstrap()
+                pullFullSnapshot()
                 return
             }
             syncOperations.applyDelta(page.notes, page.nextSyncToken)
@@ -59,11 +59,11 @@ class SyncEngine @Inject constructor(
         }
     }
 
-    private suspend fun bootstrap() {
+    private suspend fun pullFullSnapshot() {
         var since: String? = null
         while (true) {
             val page = transport.pull(since)
-            syncOperations.applyBootstrap(page.notes, page.nextSyncToken)
+            syncOperations.applySnapshot(page.notes, page.nextSyncToken)
             if (!page.hasMore) return
             since = page.nextSyncToken
         }

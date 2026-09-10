@@ -18,6 +18,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -73,6 +74,8 @@ fun NotesListContent(
             )
         },
     ) { padding ->
+        val dateFormat = remember { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT) }
+
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             SearchField(
                 value = uiState.searchQuery,
@@ -106,7 +109,9 @@ fun NotesListContent(
                         ContentCard(
                             title = note.title.ifBlank { stringResource(DesignSystemR.string.note_untitled) },
                             snippet = note.bodySnippet,
-                            meta = formatTimestamp(note.lastUpdated),
+                            meta = remember(note.lastUpdated, dateFormat) {
+                                dateFormat.format(Date(note.lastUpdated))
+                            },
                             onClick = { onNoteClick(note.id) },
                             leading = {
                                 StatusDot(
@@ -143,6 +148,3 @@ private fun SyncState.labelRes(): Int = when (this) {
     SyncState.PENDING -> R.string.notes_list_status_pending
     SyncState.CONFLICT -> R.string.notes_list_status_conflict
 }
-
-private fun formatTimestamp(millis: Long): String =
-    DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(millis))

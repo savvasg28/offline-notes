@@ -367,7 +367,7 @@ class NoteTransactionsTest {
 
         transactions.write("local-only", "T2", "B2", now = 2000)
 
-        transactions.applyBootstrap(remoteNotes = emptyList(), newSyncToken = "boot-1", now = 3000)
+        transactions.applySnapshot(remoteNotes = emptyList(), newSyncToken = "boot-1", now = 3000)
 
         assertThat(db.noteDao().getNote("gone-remotely")).isNull()
 
@@ -378,14 +378,14 @@ class NoteTransactionsTest {
     }
 
     @Test
-    fun `applyBootstrap does not purge a note that still has a live op`() = runTest {
+    fun `applySnapshot does not purge a note that still has a live op`() = runTest {
         transactions.write("note-1", "T1", "B1", now = 1000)
         val opId = db.outboxDao().getPendingForNote("note-1")!!.opId
         transactions.markApplied(opId, newVersion = "1")
         transactions.write("note-1", "T2", "B2", now = 2000)
         transactions.freeze()
 
-        transactions.applyBootstrap(remoteNotes = emptyList(), newSyncToken = "boot-1", now = 3000)
+        transactions.applySnapshot(remoteNotes = emptyList(), newSyncToken = "boot-1", now = 3000)
 
         assertThat(db.noteDao().getNote("note-1")).isNotNull()
     }

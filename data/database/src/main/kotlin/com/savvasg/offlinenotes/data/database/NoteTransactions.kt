@@ -153,7 +153,7 @@ class NoteTransactions @Inject constructor(
         }
     }
 
-    suspend fun applyBootstrap(remoteNotes: List<RemoteNoteChange>, newSyncToken: String, now: Long) {
+    suspend fun applySnapshot(remoteNotes: List<RemoteNoteChange>, newSyncToken: String, now: Long) {
         transaction {
             applyRemoteNotes(remoteNotes, now)
 
