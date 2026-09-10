@@ -48,7 +48,7 @@ class SyncEngineTest {
             mockk(relaxed = true),
         )
         transport = FakeTransport()
-        engine = SyncEngine(repository, transport)
+        engine = SyncEngine(repository, transport, mockk(relaxed = true))
     }
 
     @After

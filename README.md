@@ -294,6 +294,15 @@ predictably, and gives you no idempotency key for retry. The outbox is what make
 no PENDING/IN_FLIGHT op" a *provable* precondition for blindly applying a pull, rather than a
 hope.
 
+## No authentication
+
+There is no auth layer, and this is a deliberate boundary rather than an oversight. No interceptor
+attaches a credential to any request, so nothing here is deployable against a real multi-user
+server as-is. `AuthFailureException` exists and is mapped from a 401 so the sync engine's failure
+handling is honest about the case, but nothing ever produces the token that would avoid one. The
+seam is `:data:network` — an OkHttp `Authenticator` plus an interceptor is where a real token would
+attach, and the sync engine already treats auth failure as a distinct, non-retryable outcome.
+
 ## Explicitly out of scope
 
 Rich text (a structured format would force the merge layer to be re-litigated — a separate

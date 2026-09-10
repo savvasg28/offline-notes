@@ -112,9 +112,15 @@ class NoteTransactions @Inject constructor(
     suspend fun markApplied(opId: String, newVersion: String) {
         transaction {
             val op = outboxDao.getById(opId) ?: return@transaction
-            noteDao.updateServerVersion(op.noteId, newVersion)
             outboxDao.delete(opId)
             val remaining = outboxDao.countForNote(op.noteId)
+
+            if (op.opType == OpType.DELETE && remaining == 0) {
+                noteDao.purge(op.noteId)
+                return@transaction
+            }
+
+            noteDao.updateServerVersion(op.noteId, newVersion)
             noteDao.updateSyncState(op.noteId, if (remaining == 0) SyncState.SYNCED else SyncState.PENDING)
         }
     }

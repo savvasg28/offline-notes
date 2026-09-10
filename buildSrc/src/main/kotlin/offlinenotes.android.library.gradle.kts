@@ -31,3 +31,9 @@ android {
         }
     }
 }
+
+androidComponents {
+    beforeVariants(selector().withBuildType("release")) { variant ->
+        variant.enableUnitTest = false
+    }
+}

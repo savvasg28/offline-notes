@@ -15,15 +15,19 @@ sealed interface SyncOutcome {
 class SyncEngine @Inject constructor(
     private val syncOperations: NoteSyncOperations,
     private val transport: SyncTransport,
+    private val monitor: SyncMonitor,
 ) {
-    suspend fun sync(): SyncOutcome {
+    suspend fun sync(): SyncOutcome = runSync().also(monitor::onSyncFinished)
+
+    private suspend fun runSync(): SyncOutcome {
         syncOperations.resetStaleInFlight()
 
         val frozen = syncOperations.freezeAndDrain()
         if (frozen.isNotEmpty()) {
             val outcomes = try {
                 transport.push(frozen)
-            } catch (ignored: TransportException) {
+            } catch (failure: TransportException) {
+                monitor.onTransportFailure(failure)
                 return SyncOutcome.TransportFailure
             }
             applyOutcomes(outcomes)
@@ -49,7 +53,8 @@ class SyncEngine @Inject constructor(
         while (true) {
             val page = try {
                 transport.pull(since)
-            } catch (ignored: SyncTokenExpiredException) {
+            } catch (expired: SyncTokenExpiredException) {
+                monitor.onSyncTokenExpired(expired)
                 pullFullSnapshot()
                 return
             }

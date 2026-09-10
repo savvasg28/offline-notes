@@ -2,6 +2,7 @@ package com.savvasg.offlinenotes.sync
 
 import android.content.Context
 import androidx.work.WorkManager
+import com.savvasg.offlinenotes.domain.sync.SyncMonitor
 import com.savvasg.offlinenotes.domain.sync.SyncTrigger
 import dagger.Binds
 import dagger.Module
@@ -24,4 +25,7 @@ object WorkManagerModule {
 abstract class SyncTriggerModule {
     @Binds
     abstract fun bindSyncTrigger(impl: WorkManagerSyncTrigger): SyncTrigger
+
+    @Binds
+    abstract fun bindSyncMonitor(impl: AndroidSyncMonitor): SyncMonitor
 }

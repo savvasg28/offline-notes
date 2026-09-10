@@ -4,12 +4,13 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
+import com.savvasg.offlinenotes.domain.ApplicationScope
 import com.savvasg.offlinenotes.domain.model.SyncState
 import com.savvasg.offlinenotes.domain.usecase.ObserveNoteUseCase
 import com.savvasg.offlinenotes.domain.usecase.RequestSyncUseCase
 import com.savvasg.offlinenotes.domain.usecase.SaveNoteUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,6 +30,7 @@ class NoteEditorViewModel @Inject constructor(
     observeNote: ObserveNoteUseCase,
     private val saveNote: SaveNoteUseCase,
     private val requestSync: RequestSyncUseCase,
+    @ApplicationScope private val applicationScope: CoroutineScope,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -69,7 +71,7 @@ class NoteEditorViewModel @Inject constructor(
         val edited = mutableUiState.updateAndGet(transform)
         if (!noteExists && edited.title.isBlank() && edited.body.isBlank()) return
         noteExists = true
-        viewModelScope.launch(NonCancellable) {
+        applicationScope.launch {
             saveNote(noteId, edited.title, edited.body)
         }
     }

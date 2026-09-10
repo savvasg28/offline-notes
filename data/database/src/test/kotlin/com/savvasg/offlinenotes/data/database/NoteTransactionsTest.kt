@@ -389,4 +389,47 @@ class NoteTransactionsTest {
 
         assertThat(db.noteDao().getNote("note-1")).isNotNull()
     }
+
+    @Test
+    fun `an acknowledged delete purges the note instead of leaving it soft-deleted forever`() = runTest {
+        transactions.write("note-1", "Title", "Body", now = 1000)
+        val created = db.outboxDao().getPendingForNote("note-1")!!
+        transactions.freeze()
+        transactions.markApplied(created.opId, "v1")
+
+        transactions.delete("note-1", now = 2000)
+        val deleteOp = db.outboxDao().getPendingForNote("note-1")!!
+        assertThat(deleteOp.opType).isEqualTo(OpType.DELETE)
+        transactions.freeze()
+        transactions.markApplied(deleteOp.opId, "v2")
+
+        assertThat(db.noteDao().getNote("note-1")).isNull()
+        assertThat(db.outboxDao().countForNote("note-1")).isEqualTo(0)
+    }
+
+    @Test
+    fun `a delete acknowledged while a newer edit is queued keeps the note`() = runTest {
+        transactions.write("note-1", "Title", "Body", now = 1000)
+        val created = db.outboxDao().getPendingForNote("note-1")!!
+        transactions.freeze()
+
+        transactions.write("note-1", "Edited after freeze", "Body", now = 1500)
+        transactions.markApplied(created.opId, "v1")
+
+        assertThat(db.noteDao().getNote("note-1")).isNotNull()
+    }
+
+    @Test
+    fun `a round that never gets an answer increments attemptCount, so a stuck op is visible`() = runTest {
+        transactions.write("note-1", "Title", "Body", now = 1000)
+        transactions.freeze()
+
+        assertThat(db.outboxDao().maxAttemptCount()).isEqualTo(0)
+
+        db.outboxDao().resetInFlightToPending()
+        transactions.freeze()
+        db.outboxDao().resetInFlightToPending()
+
+        assertThat(db.outboxDao().maxAttemptCount()).isEqualTo(2)
+    }
 }

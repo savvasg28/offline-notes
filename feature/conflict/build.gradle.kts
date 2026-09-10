@@ -40,4 +40,11 @@ dependencies {
 
     implementation(libs.androidx.navigation.compose)
     implementation(libs.hilt.navigation.compose)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.androidx.compose.ui.test.junit4)
+    testImplementation(libs.truth)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

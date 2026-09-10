@@ -39,8 +39,11 @@ interface OutboxDao {
     @Query("SELECT EXISTS(SELECT 1 FROM outbox WHERE noteId = :noteId AND status = 'PARKED')")
     suspend fun hasParked(noteId: String): Boolean
 
-    @Query("UPDATE outbox SET status = 'PENDING' WHERE status = 'IN_FLIGHT'")
+    @Query("UPDATE outbox SET status = 'PENDING', attemptCount = attemptCount + 1 WHERE status = 'IN_FLIGHT'")
     suspend fun resetInFlightToPending()
+
+    @Query("SELECT MAX(attemptCount) FROM outbox")
+    suspend fun maxAttemptCount(): Int?
 
     @Query("SELECT * FROM outbox ORDER BY createdAt ASC")
     fun observeAll(): Flow<List<OutboxEntity>>
