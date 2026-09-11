@@ -11,6 +11,7 @@ interface NoteRepository {
     suspend fun saveNote(id: String, title: String, body: String)
     suspend fun deleteNote(id: String)
     suspend fun resolveConflict(noteId: String, title: String, body: String)
+    suspend fun discardRejectedChange(noteId: String)
     fun searchNotes(query: String): Flow<List<NoteSummary>>
 
     fun observeConflict(noteId: String): Flow<NoteConflict?>

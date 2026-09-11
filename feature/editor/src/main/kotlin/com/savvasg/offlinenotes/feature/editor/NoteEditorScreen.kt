@@ -16,11 +16,11 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.savvasg.offlinenotes.core.designsystem.component.InlineBanner
 import com.savvasg.offlinenotes.core.designsystem.component.NotesTopAppBar
@@ -56,6 +56,7 @@ fun NoteEditorScreen(
         onBodyChange = viewModel::onBodyChange,
         onBack = onBack,
         onResolveConflict = { onResolveConflict(viewModel.noteId) },
+        onDiscardRejected = viewModel::onDiscardRejected,
     )
 }
 
@@ -66,6 +67,7 @@ fun NoteEditorContent(
     onBodyChange: (String) -> Unit,
     onBack: () -> Unit,
     onResolveConflict: () -> Unit,
+    onDiscardRejected: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -99,6 +101,15 @@ fun NoteEditorContent(
                     onAction = onResolveConflict,
                 )
             }
+            if (uiState.syncState == SyncState.REJECTED) {
+                InlineBanner(
+                    text = uiState.rejectionMessage?.takeIf { it.isNotBlank() }
+                        ?: stringResource(R.string.editor_rejected_banner),
+                    actionLabel = stringResource(R.string.editor_rejected_discard),
+                    onAction = onDiscardRejected,
+                )
+            }
+            if (uiState.isLoading) return@Column
             SeamlessTextField(
                 value = uiState.title,
                 onValueChange = onTitleChange,

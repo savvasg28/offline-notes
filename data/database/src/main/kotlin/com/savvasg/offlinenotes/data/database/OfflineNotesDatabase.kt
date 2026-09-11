@@ -2,6 +2,7 @@ package com.savvasg.offlinenotes.data.database
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.execSQL
 import com.savvasg.offlinenotes.data.database.dao.ConflictDao
@@ -15,7 +16,7 @@ import com.savvasg.offlinenotes.data.database.entity.SyncMetaEntity
 
 @Database(
     entities = [NoteEntity::class, OutboxEntity::class, NoteConflictEntity::class, SyncMetaEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 abstract class OfflineNotesDatabase : RoomDatabase() {
@@ -26,6 +27,13 @@ abstract class OfflineNotesDatabase : RoomDatabase() {
 
     companion object {
         const val DB_NAME = "offline_notes.db"
+
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("ALTER TABLE outbox ADD COLUMN rejectionCode TEXT")
+                connection.execSQL("ALTER TABLE outbox ADD COLUMN rejectionMessage TEXT")
+            }
+        }
 
         val SCHEMA_CALLBACK = object : RoomDatabase.Callback() {
             override fun onCreate(connection: SQLiteConnection) {

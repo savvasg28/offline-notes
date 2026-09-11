@@ -7,11 +7,13 @@ import com.savvasg.offlinenotes.data.database.dao.OutboxDao
 import com.savvasg.offlinenotes.data.database.dao.SyncMetaDao
 import com.savvasg.offlinenotes.data.database.dao.searchActiveNotes
 import com.savvasg.offlinenotes.data.database.entity.NoteEntity
+import com.savvasg.offlinenotes.data.database.entity.OutboxEntity
 import com.savvasg.offlinenotes.domain.model.ConflictPayload
 import com.savvasg.offlinenotes.domain.model.FrozenOutboxOp
 import com.savvasg.offlinenotes.domain.model.Note
 import com.savvasg.offlinenotes.domain.model.NoteConflict
 import com.savvasg.offlinenotes.domain.model.NoteSummary
+import com.savvasg.offlinenotes.domain.model.RejectionReason
 import com.savvasg.offlinenotes.domain.model.RemoteNoteChange
 import com.savvasg.offlinenotes.domain.repository.NoteRepository
 import com.savvasg.offlinenotes.domain.repository.NoteSyncOperations
@@ -37,7 +39,9 @@ class NoteRepositoryImpl @Inject constructor(
         noteDao.observeActiveNotes().map { notes -> notes.map { it.toSummary() } }
 
     override fun observeNote(id: String): Flow<Note?> =
-        noteDao.observeNote(id).map { it?.toDomain() }
+        combine(noteDao.observeNote(id), outboxDao.observeRejectedForNote(id)) { note, rejected ->
+            note?.toDomain(rejected?.toRejectionReason())
+        }
 
     override suspend fun saveNote(id: String, title: String, body: String) {
         transactions.write(id, title, body, now = System.currentTimeMillis())
@@ -51,6 +55,11 @@ class NoteRepositoryImpl @Inject constructor(
 
     override suspend fun resolveConflict(noteId: String, title: String, body: String) {
         transactions.resolveConflict(noteId, title, body, now = System.currentTimeMillis())
+        syncTrigger.requestSync()
+    }
+
+    override suspend fun discardRejectedChange(noteId: String) {
+        transactions.discardRejected(noteId)
         syncTrigger.requestSync()
     }
 
@@ -80,7 +89,8 @@ class NoteRepositoryImpl @Inject constructor(
     override suspend fun applyResult(opId: String, ack: OpAcknowledgement) {
         when (ack) {
             is OpAcknowledgement.Applied -> transactions.markApplied(opId, ack.newVersion)
-            OpAcknowledgement.Rejected -> transactions.markRejected(opId)
+            is OpAcknowledgement.Rejected ->
+                transactions.markRejected(opId, ack.code, ack.message, now = System.currentTimeMillis())
         }
     }
 
@@ -92,8 +102,12 @@ class NoteRepositoryImpl @Inject constructor(
         transactions.applyDelta(remoteNotes, newSyncToken, now = System.currentTimeMillis())
     }
 
-    override suspend fun applySnapshot(remoteNotes: List<RemoteNoteChange>, newSyncToken: String) {
-        transactions.applySnapshot(remoteNotes, newSyncToken, now = System.currentTimeMillis())
+    override suspend fun applySnapshotPage(remoteNotes: List<RemoteNoteChange>) {
+        transactions.applySnapshotPage(remoteNotes, now = System.currentTimeMillis())
+    }
+
+    override suspend fun completeSnapshot(presentNoteIds: Set<String>, newSyncToken: String) {
+        transactions.completeSnapshot(presentNoteIds, newSyncToken)
     }
 
     override suspend fun resetStaleInFlight() {
@@ -105,7 +119,7 @@ class NoteRepositoryImpl @Inject constructor(
     override suspend fun hasPendingOps(): Boolean = outboxDao.hasAnyPending()
 }
 
-private fun NoteEntity.toDomain() = Note(
+private fun NoteEntity.toDomain(rejection: RejectionReason?) = Note(
     id = id,
     title = title,
     body = body,
@@ -113,7 +127,13 @@ private fun NoteEntity.toDomain() = Note(
     isDeleted = isDeleted,
     createdAt = createdAt,
     lastUpdated = lastUpdated,
+    rejection = rejection,
 )
+
+private fun OutboxEntity.toRejectionReason(): RejectionReason? {
+    val code = rejectionCode ?: return null
+    return RejectionReason(code = code, message = rejectionMessage.orEmpty())
+}
 
 private const val SNIPPET_LENGTH = 140
 

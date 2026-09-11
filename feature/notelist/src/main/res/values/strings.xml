@@ -10,4 +10,5 @@
     <string name="notes_list_status_synced">Synced</string>
     <string name="notes_list_status_pending">Waiting to sync</string>
     <string name="notes_list_status_conflict">Needs review</string>
+    <string name="notes_list_status_rejected">Not saved</string>
 </resources>

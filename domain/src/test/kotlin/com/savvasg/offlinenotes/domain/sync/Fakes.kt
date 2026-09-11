@@ -16,7 +16,8 @@ class RecordingSyncOperations(
     val acknowledgements = mutableListOf<Pair<String, OpAcknowledgement>>()
     val stagedConflicts = mutableListOf<Pair<String, ConflictPayload>>()
     val appliedDeltas = mutableListOf<Pair<List<RemoteNoteChange>, String>>()
-    val appliedSnapshots = mutableListOf<Pair<List<RemoteNoteChange>, String>>()
+    val snapshotPages = mutableListOf<List<RemoteNoteChange>>()
+    val completedSnapshots = mutableListOf<Pair<Set<String>, String>>()
     var staleResets = 0
 
     override suspend fun freezeAndDrain(): List<FrozenOutboxOp> = frozen.also { frozen = emptyList() }
@@ -33,8 +34,12 @@ class RecordingSyncOperations(
         appliedDeltas += remoteNotes to newSyncToken
     }
 
-    override suspend fun applySnapshot(remoteNotes: List<RemoteNoteChange>, newSyncToken: String) {
-        appliedSnapshots += remoteNotes to newSyncToken
+    override suspend fun applySnapshotPage(remoteNotes: List<RemoteNoteChange>) {
+        snapshotPages += remoteNotes
+    }
+
+    override suspend fun completeSnapshot(presentNoteIds: Set<String>, newSyncToken: String) {
+        completedSnapshots += presentNoteIds to newSyncToken
     }
 
     override suspend fun resetStaleInFlight() {
@@ -56,6 +61,8 @@ class ScriptedTransport : SyncTransport {
     var pages: MutableList<RemoteChangePage> = mutableListOf()
     var failPushWith: TransportException? = null
     var expireTokenOnce = false
+    var failPullAfterPages: Int? = null
+    private var pagesPulled = 0
 
     override suspend fun push(ops: List<FrozenOutboxOp>): List<OpOutcome> {
         pushed += ops
@@ -69,6 +76,10 @@ class ScriptedTransport : SyncTransport {
             expireTokenOnce = false
             throw SyncTokenExpiredException()
         }
+        failPullAfterPages?.let { limit ->
+            if (pagesPulled >= limit) throw NetworkException("pull failed")
+        }
+        pagesPulled++
         return if (pages.isNotEmpty()) pages.removeAt(0) else emptyPage(since)
     }
 

@@ -11,16 +11,25 @@ import com.savvasg.offlinenotes.domain.model.SyncState
 class NoteEditorUiStateProvider : PreviewParameterProvider<NoteEditorUiState> {
     override val values = sequenceOf(
         NoteEditorUiState(
+            isLoading = false,
             title = "Weekly review",
             body = "Ship the sync engine rewrite.\n\nThe outbox coalescing held up under the " +
                 "rapid-edit test, so the remaining risk is the bootstrap path after a token expiry.",
             syncState = SyncState.SYNCED,
         ),
-        NoteEditorUiState(title = "", body = "", syncState = null),
+        NoteEditorUiState(isLoading = false, title = "", body = "", syncState = null),
         NoteEditorUiState(
+            isLoading = false,
             title = "Groceries",
             body = "Olive oil, sourdough, coffee beans.",
             syncState = SyncState.CONFLICT,
+        ),
+        NoteEditorUiState(
+            isLoading = false,
+            title = "Quarterly numbers",
+            body = "Revenue is up 12% quarter on quarter.",
+            syncState = SyncState.REJECTED,
+            rejectionMessage = "A note body cannot exceed 64 KB.",
         ),
     )
 }
@@ -38,6 +47,7 @@ private fun NoteEditorContentPreview(
             onBodyChange = {},
             onBack = {},
             onResolveConflict = {},
+            onDiscardRejected = {},
         )
     }
 }

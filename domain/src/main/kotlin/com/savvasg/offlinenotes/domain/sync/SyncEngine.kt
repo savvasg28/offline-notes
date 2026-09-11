@@ -22,18 +22,16 @@ class SyncEngine @Inject constructor(
     private suspend fun runSync(): SyncOutcome {
         syncOperations.resetStaleInFlight()
 
-        val frozen = syncOperations.freezeAndDrain()
-        if (frozen.isNotEmpty()) {
-            val outcomes = try {
-                transport.push(frozen)
-            } catch (failure: TransportException) {
-                monitor.onTransportFailure(failure)
-                return SyncOutcome.TransportFailure
+        try {
+            val frozen = syncOperations.freezeAndDrain()
+            if (frozen.isNotEmpty()) {
+                applyOutcomes(transport.push(frozen))
             }
-            applyOutcomes(outcomes)
+            drainRemoteChanges()
+        } catch (failure: TransportException) {
+            monitor.onTransportFailure(failure)
+            return SyncOutcome.TransportFailure
         }
-
-        drainRemoteChanges()
 
         return if (syncOperations.hasPendingOps()) SyncOutcome.MoreWorkPending else SyncOutcome.Done
     }
@@ -41,9 +39,14 @@ class SyncEngine @Inject constructor(
     private suspend fun applyOutcomes(outcomes: List<OpOutcome>) {
         for (outcome in outcomes) {
             when (outcome) {
-                is OpOutcome.Applied -> syncOperations.applyResult(outcome.opId, OpAcknowledgement.Applied(outcome.newVersion))
-                is OpOutcome.Rejected -> syncOperations.applyResult(outcome.opId, OpAcknowledgement.Rejected)
-                is OpOutcome.Conflicted -> syncOperations.stageConflict(outcome.opId, outcome.conflict)
+                is OpOutcome.Applied ->
+                    syncOperations.applyResult(outcome.opId, OpAcknowledgement.Applied(outcome.newVersion))
+
+                is OpOutcome.Rejected ->
+                    syncOperations.applyResult(outcome.opId, OpAcknowledgement.Rejected(outcome.code, outcome.message))
+
+                is OpOutcome.Conflicted ->
+                    syncOperations.stageConflict(outcome.opId, outcome.conflict)
             }
         }
     }
@@ -65,11 +68,16 @@ class SyncEngine @Inject constructor(
     }
 
     private suspend fun pullFullSnapshot() {
+        val presentNoteIds = mutableSetOf<String>()
         var since: String? = null
         while (true) {
             val page = transport.pull(since)
-            syncOperations.applySnapshot(page.notes, page.nextSyncToken)
-            if (!page.hasMore) return
+            syncOperations.applySnapshotPage(page.notes)
+            page.notes.mapTo(presentNoteIds) { it.noteId }
+            if (!page.hasMore) {
+                syncOperations.completeSnapshot(presentNoteIds, page.nextSyncToken)
+                return
+            }
             since = page.nextSyncToken
         }
     }

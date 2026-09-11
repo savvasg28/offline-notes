@@ -31,6 +31,21 @@ class NoteTransactions @Inject constructor(
     private suspend fun <R> transaction(block: suspend () -> R): R =
         db.useWriterConnection { connection -> connection.immediateTransaction { block() } }
 
+    private suspend fun recomputeSyncState(noteId: String) {
+        val state = when {
+            conflictDao.getForNote(noteId) != null -> SyncState.CONFLICT
+            outboxDao.hasRejected(noteId) -> SyncState.REJECTED
+            outboxDao.hasPendingOrInFlight(noteId) -> SyncState.PENDING
+            else -> SyncState.SYNCED
+        }
+        noteDao.updateSyncState(noteId, state)
+    }
+
+    private suspend fun hasLiveOp(noteId: String): Boolean =
+        outboxDao.hasPendingOrInFlight(noteId) ||
+            outboxDao.hasParked(noteId) ||
+            outboxDao.hasRejected(noteId)
+
     suspend fun write(noteId: String, title: String, body: String, now: Long) {
         transaction {
             val existing = noteDao.getNote(noteId)
@@ -46,6 +61,8 @@ class NoteTransactions @Inject constructor(
                     lastUpdated = now,
                 ),
             )
+
+            outboxDao.deleteRejectedForNote(noteId)
 
             val pendingOp = outboxDao.getPendingForNote(noteId)
             if (pendingOp != null) {
@@ -64,6 +81,8 @@ class NoteTransactions @Inject constructor(
                     ),
                 )
             }
+
+            recomputeSyncState(noteId)
         }
     }
 
@@ -71,6 +90,8 @@ class NoteTransactions @Inject constructor(
         transaction {
             val existing = noteDao.getNote(noteId) ?: return@transaction
             noteDao.upsert(existing.copy(syncState = SyncState.PENDING, isDeleted = true, lastUpdated = now))
+
+            outboxDao.deleteRejectedForNote(noteId)
 
             val pendingOp = outboxDao.getPendingForNote(noteId)
             if (pendingOp != null) {
@@ -89,6 +110,8 @@ class NoteTransactions @Inject constructor(
                     ),
                 )
             }
+
+            recomputeSyncState(noteId)
         }
     }
 
@@ -113,15 +136,34 @@ class NoteTransactions @Inject constructor(
         transaction {
             val op = outboxDao.getById(opId) ?: return@transaction
             outboxDao.delete(opId)
-            val remaining = outboxDao.countForNote(op.noteId)
 
-            if (op.opType == OpType.DELETE && remaining == 0) {
+            if (op.opType == OpType.DELETE && outboxDao.countForNote(op.noteId) == 0) {
                 noteDao.purge(op.noteId)
                 return@transaction
             }
 
             noteDao.updateServerVersion(op.noteId, newVersion)
-            noteDao.updateSyncState(op.noteId, if (remaining == 0) SyncState.SYNCED else SyncState.PENDING)
+            recomputeSyncState(op.noteId)
+        }
+    }
+
+    suspend fun markRejected(opId: String, code: String, message: String, now: Long) {
+        transaction {
+            val op = outboxDao.getById(opId) ?: return@transaction
+            outboxDao.markRejected(opId, code, message)
+
+            if (op.opType == OpType.DELETE) {
+                noteDao.updateIsDeleted(op.noteId, isDeleted = false, now = now)
+            }
+
+            recomputeSyncState(op.noteId)
+        }
+    }
+
+    suspend fun discardRejected(noteId: String) {
+        transaction {
+            outboxDao.deleteRejectedForNote(noteId)
+            recomputeSyncState(noteId)
         }
     }
 
@@ -142,14 +184,8 @@ class NoteTransactions @Inject constructor(
                     detectedAt = detectedAt,
                 ),
             )
-            noteDao.updateSyncState(op.noteId, SyncState.CONFLICT)
+            recomputeSyncState(op.noteId)
         }
-    }
-
-    suspend fun markRejected(opId: String): OutboxEntity? = transaction {
-        val op = outboxDao.getById(opId) ?: return@transaction null
-        outboxDao.delete(opId)
-        op
     }
 
     suspend fun applyDelta(remoteNotes: List<RemoteNoteChange>, newSyncToken: String, now: Long) {
@@ -159,13 +195,16 @@ class NoteTransactions @Inject constructor(
         }
     }
 
-    suspend fun applySnapshot(remoteNotes: List<RemoteNoteChange>, newSyncToken: String, now: Long) {
+    suspend fun applySnapshotPage(remoteNotes: List<RemoteNoteChange>, now: Long) {
         transaction {
             applyRemoteNotes(remoteNotes, now)
+        }
+    }
 
-            val remoteIds = remoteNotes.mapTo(mutableSetOf()) { it.noteId }
+    suspend fun completeSnapshot(presentNoteIds: Set<String>, newSyncToken: String) {
+        transaction {
             for (local in noteDao.getAllSyncedNotes()) {
-                val absentFromSnapshot = local.id !in remoteIds
+                val absentFromSnapshot = local.id !in presentNoteIds
                 if (absentFromSnapshot && !hasLiveOp(local.id)) {
                     noteDao.purge(local.id)
                 }
@@ -175,9 +214,6 @@ class NoteTransactions @Inject constructor(
         }
     }
 
-    private suspend fun hasLiveOp(noteId: String): Boolean =
-        outboxDao.hasPendingOrInFlight(noteId) || outboxDao.hasParked(noteId)
-
     private suspend fun applyRemoteNotes(remoteNotes: List<RemoteNoteChange>, now: Long) {
         for (remote in remoteNotes) {
             applyRemoteNote(remote, now)
@@ -185,7 +221,7 @@ class NoteTransactions @Inject constructor(
     }
 
     private suspend fun applyRemoteNote(remote: RemoteNoteChange, now: Long) {
-        if (outboxDao.hasPendingOrInFlight(remote.noteId)) return
+        if (outboxDao.hasPendingOrInFlight(remote.noteId) || outboxDao.hasRejected(remote.noteId)) return
         if (outboxDao.hasParked(remote.noteId)) {
             conflictDao.refreshRemote(
                 remote.noteId,
@@ -219,6 +255,8 @@ class NoteTransactions @Inject constructor(
         transaction {
             val conflict = conflictDao.getForNote(noteId) ?: return@transaction
             outboxDao.delete(conflict.opId)
+            outboxDao.getPendingForNote(noteId)?.let { outboxDao.delete(it.opId) }
+            outboxDao.deleteRejectedForNote(noteId)
             conflictDao.delete(noteId)
 
             noteDao.upsert(
@@ -245,6 +283,8 @@ class NoteTransactions @Inject constructor(
                     attemptCount = 0,
                 ),
             )
+
+            recomputeSyncState(noteId)
         }
     }
 }

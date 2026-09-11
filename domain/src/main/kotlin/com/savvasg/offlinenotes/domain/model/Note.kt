@@ -8,6 +8,12 @@ data class Note(
     val isDeleted: Boolean,
     val createdAt: Long,
     val lastUpdated: Long,
+    val rejection: RejectionReason? = null,
+)
+
+data class RejectionReason(
+    val code: String,
+    val message: String,
 )
 
 data class NoteSummary(

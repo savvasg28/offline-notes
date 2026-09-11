@@ -141,10 +141,12 @@ private fun SyncState.color(): Color = when (this) {
     SyncState.SYNCED -> OfflineNotesTheme.statusColors.synced
     SyncState.PENDING -> OfflineNotesTheme.statusColors.pending
     SyncState.CONFLICT -> OfflineNotesTheme.statusColors.conflict
+    SyncState.REJECTED -> OfflineNotesTheme.statusColors.rejected
 }
 
 private fun SyncState.labelRes(): Int = when (this) {
     SyncState.SYNCED -> R.string.notes_list_status_synced
     SyncState.PENDING -> R.string.notes_list_status_pending
     SyncState.CONFLICT -> R.string.notes_list_status_conflict
+    SyncState.REJECTED -> R.string.notes_list_status_rejected
 }

@@ -16,6 +16,7 @@ against a scriptable in-process stub, and it's fully functional offline the mome
 
 Every design decision in this repo traces back to one of these five. They are not aspirational —
 they're enforced by the schema, the transaction boundaries, and the tests in §Testing below.
+Each is stated narrowly on purpose; §Guarantees below says exactly how far each one reaches.
 
 1. **Zero data loss.** No user edit is ever silently discarded. Every local mutation is durable
    before it is acknowledged to the user.
@@ -28,6 +29,22 @@ they're enforced by the schema, the transaction boundaries, and the tests in §T
    related writes must be impossible.
 5. **Idempotent retries.** Any request may be sent more than once. Re-sending must never
    duplicate an effect.
+
+## Guarantees
+
+An invariant is only worth as much as its scope. These are the precise claims — what the client
+actually guarantees, and where each one stops.
+
+| Concern | What is guaranteed | What is **not** |
+|---|---|---|
+| Local durability | A committed edit survives process death. The write is a single transaction and returns before the UI is told. | Nothing about the server having seen it. |
+| Retry safety | A given `opId` always names the byte-identical operation. A frozen op is immutable; later edits go to a new row. | Server-side dedupe. The client sends a stable idempotency key; honouring it is the server's half of the contract. |
+| Local-edit protection | Remote state never overwrites a note with an unresolved local op — pending, in-flight, parked on a conflict, or rejected. | Notes with no live op, which a pull is free to update. |
+| Convergence | Given eventual connectivity, a conforming server, and conflicts the user has resolved, replicas converge. | Convergence while a conflict sits unresolved, or against a server that ignores `baseVersion`. |
+| Background scheduling | A sync is *requested* after a target delay. | Any upper bound on when it runs. WorkManager's initial delay is the earliest eligible time; Doze, standby buckets and the network constraint all push it later. |
+
+The last row is the one most worth stating plainly: there is no bounded staleness window on
+Android, and any design claiming one is describing the happy path.
 
 ## Architecture
 
@@ -128,10 +145,15 @@ per-build-type `BuildConfig.API_BASE_URL`, so there is nothing to switch at runt
 (`observeNotes`, `saveNote`, `resolveConflict`, ...); `NoteSyncOperations` is sync-facing
 (`freezeAndDrain`, `applyResult`, `stageConflict`, `applyDelta`, `resetStaleInFlight`). The sync
 engine only ever sees `NoteSyncOperations` — it is *structurally incapable* of calling
-`saveNote()`, because that method isn't on the interface it holds a reference to. This is what
-makes invariant 2 a compile-time guarantee rather than a code-review discipline: if the sync
-engine generated an outbox op from pulled data, it would echo the server's own changes back at
-it.
+`saveNote()`, because that method isn't on the interface it holds a reference to. If the sync
+engine generated an outbox op from pulled data, it would echo the server's own changes back at it;
+the split makes that particular mistake unwriteable.
+
+That is the whole of what the type system buys, and it is worth being exact about it. Invariant 2
+has two halves: *push responses never write content* is structural and holds at compile time; *remote
+state only lands on notes with no live local op* is a runtime rule, enforced by the skip check in
+`applyRemoteNote` and covered by tests, not by types. Every defect this design has actually
+produced lived in the second half.
 
 ## The op lifecycle
 
@@ -141,16 +163,33 @@ stateDiagram-v2
     PENDING --> IN_FLIGHT: freeze txn\n(linearization point)
     IN_FLIGHT --> [*]: APPLIED\n(op deleted)
     IN_FLIGHT --> PARKED: CONFLICT\n(three inputs staged)
-    IN_FLIGHT --> [*]: REJECTED\n(op deleted, poison pill)
+    IN_FLIGHT --> REJECTED: REJECTED\n(poison pill, reason stored)
     IN_FLIGHT --> PENDING: crash\n(reset on next worker start)
     PARKED --> PENDING: user resolves\n(new opId, baseVersion = remoteVersion)
+    REJECTED --> PENDING: user edits again\n(supersedes)
+    REJECTED --> [*]: user discards
 ```
 
-An op row is deleted only when its data is on the server, or the user has explicitly superseded
-it. No TTL, no GC — expiry would be silent data loss. Edits arriving while an op is `IN_FLIGHT` or
-`PARKED` create a **new** row rather than mutating the in-flight one; the partial unique index
-`idx_outbox_one_pending` (WHERE `status = 'PENDING'`) is what makes "at most one *mutable* op per
-note" a schema-level fact, not a convention.
+An op row is deleted only when its data is on the server, or the user has explicitly superseded or
+discarded it. No TTL, no GC — expiry would be silent data loss. Edits arriving while an op is
+`IN_FLIGHT` or `PARKED` create a **new** row rather than mutating the in-flight one; the partial
+unique index `idx_outbox_one_pending` (WHERE `status = 'PENDING'`) is what makes "at most one
+*mutable* op per note" a schema-level fact, not a convention.
+
+**A rejection is terminal for the op, never for the edit.** The server refusing an op means
+re-sending it is pointless, so it is never retried — but the row stays, in `REJECTED`, carrying the
+server's `code` and `message`. That matters for more than the badge: the skip rule keys off a note
+having *any* live op, so keeping the row is what stops the next pull from quietly overwriting the
+text the server just refused. The user's escape hatches are editing again (which supersedes the
+rejected op) or discarding it (which drops the row and lets the next pull reconcile the note). A
+rejected `DELETE` also clears the local tombstone — the server says the note still exists, so
+hiding it locally would strand it.
+
+**Note `syncState` is derived, never assigned ad hoc.** Every transaction that touches the outbox
+or the conflict table ends by recomputing it from those tables, with a fixed precedence:
+`CONFLICT` > `REJECTED` > `PENDING` > `SYNCED`. This is why typing during a staged conflict no
+longer drops the note out of `CONFLICT` and strands the resolution screen — the state can't
+disagree with the rows it's supposed to summarise.
 
 ## Conflict sequence
 
@@ -178,21 +217,50 @@ Detection happens **only on push** — a pull carries no `baseVersion`, so it ca
 creating conflicts (the skip rule), never detect one. There is no `/resolve` endpoint: resolution
 is an ordinary `UPDATE` op with the same idempotency and CAS as any other write.
 
+## Bootstrap after an expired token
+
+When the server rejects a sync token, the client falls back to a full snapshot: it pages through
+everything the server has, then deletes any locally-synced note the snapshot didn't mention. That
+sweep is the dangerous part, and it is why the snapshot is a three-call protocol rather than one
+call per page:
+
+```
+applySnapshotPage(page)      # per page — applies rows, touches nothing else
+applySnapshotPage(page)
+completeSnapshot(ids, token) # once — sweeps, then advances the token
+```
+
+Sweeping per page would delete every note that happens to live on a later page, then delete the
+earlier pages' notes when the later ones arrive; a two-page bootstrap would leave you holding only
+the last page. The sweep therefore runs once, against the union of note ids seen across every
+page, and the sync token is written only at completion — an interrupted bootstrap must not leave
+the token pointing at a pagination cursor, or the next delta pull would resume from the middle of
+a snapshot and silently skip the remainder.
+
+The failure direction is deliberate: a crash mid-bootstrap leaves extra local notes, which the
+next snapshot sweeps. It never deletes notes it shouldn't.
+
 ## Sync triggers
 
 | Trigger | Behaviour |
 |---|---|
-| First edit | Enqueue unique work (`KEEP`) with initial delay **W ≈ 30s**. Subsequent edits no-op. |
+| First edit | Enqueue unique work (`KEEP`) with a target delay **W ≈ 30s**. Subsequent edits no-op. |
 | Connectivity regained | Free — the queued work's network constraint fires. |
 | Editor close / app background | Expedited, no delay. Flushes the session tail. |
 | App foreground | Delta pull. Primary freshness mechanism. |
 | Periodic | Long-interval backstop only (≥ 6h) — `ensurePeriodicSync()`. |
 
-**W is the bounded data-loss window** — the maximum span of typing that exists on one device
-only — named as such in [`WorkManagerSyncTrigger`](sync/work/src/main/kotlin/com/savvasg/offlinenotes/sync/work/WorkManagerSyncTrigger.kt).
-It's delay-*from-first-edit*, not debounce-from-last: a debounce never fires during continuous
-typing, so staleness would grow unbounded exactly when the user is producing the most unsynced
-work.
+**W is a target, not a bound.** It is delay-*from-first-edit*, not debounce-from-last: a debounce
+never fires during continuous typing, so staleness would grow without limit exactly when the user
+is producing the most unsynced work. Anchoring to the first edit caps how long a *typing session*
+goes unsynced under good conditions — see
+[`WorkManagerSyncTrigger`](sync/src/main/kotlin/com/savvasg/offlinenotes/sync/WorkManagerSyncTrigger.kt).
+
+What W is not is an upper bound on anything. WorkManager treats an initial delay as the earliest
+eligible time; the network constraint, Doze and the app's standby bucket can all push actual
+execution arbitrarily later. The honest statement of device-loss exposure is "everything since the
+last successful sync," and the editor-close expedited request exists to make that window small in
+practice rather than to make it bounded in theory.
 
 No FCM: pull-on-foreground meets the freshness bar for a feature-tier product, at the cost of a
 wider multi-device concurrency window — absorbed by the conflict machinery above, not by
@@ -220,13 +288,19 @@ same Mockoon instance to watch two devices converge on shared state.
 ## Testing
 
 ```bash
-./gradlew testDebugUnitTest         # 48 tests, across every module that has any
-./gradlew connectedDebugAndroidTest # 4 tests (:data:database), needs a device/emulator
+./gradlew test                      # 89 tests, across every module that has any
+./gradlew connectedDebugAndroidTest # 5 tests (:data:database), needs a device/emulator
 ```
 
-Unqualified: unit tests live wherever the thing they test lives (`:data`, `:data:database`,
-`:data:network`, `:sync`, `:feature:notelist`, `:feature:editor`), not all in `:app`, and an unqualified Gradle
-task name runs in every module that declares it.
+Unqualified: unit tests live wherever the thing they test lives (`:domain`, `:data`,
+`:data:database`, `:data:network`, `:sync`, and the three `:feature` modules), not all in `:app`,
+and an unqualified Gradle task name runs in every module that declares it. `:domain` is a plain
+Kotlin module, so `SyncEngineTest` there runs against fake ports with no Android on the classpath
+at all — the engine's whole contract is exercised in milliseconds.
+
+Release-variant unit tests are disabled in the convention plugins: they ran the same bytecode as
+the debug ones (no R8 is involved in a unit test) while lacking the debug-only Compose test
+manifest.
 
 CI (`.github/workflows/ci.yml`) runs both on every push: a plain JVM job for the unit tests, and a
 `reactivecircus/android-emulator-runner` job for the instrumented ones.
@@ -242,14 +316,25 @@ Named scenario tests, each corresponding to a real defect found while designing 
 | `resolution_supersedes_parked_op` | `NoteTransactionsTest`, `SyncEngineTest` | One transaction; new op with `baseVersion = remoteVersion`. |
 | `delete_edit_race_resurrects` | `NoteTransactionsTest` | Remote tombstone vs. local pending edit → note survives. |
 | `expired_token_triggers_rebootstrap` | `NoteTransactionsTest` | Local-only notes survive; previously-synced-and-now-absent notes are purged. |
+| `a multi-page snapshot keeps every page` | `NoteTransactionsTest`, `SyncEngineTest` | The sweep runs once against the union of pages, not per page. |
+| `an interrupted snapshot never advances the sync token` | `SyncEngineTest` | A failed bootstrap leaves the token untouched rather than at a pagination cursor. |
+| `a rejected edit keeps its pull protection` | `NoteTransactionsTest` | A refused op stays in the outbox, so a later pull can't overwrite the text. |
+| `a rejected DELETE restores the note` | `NoteTransactionsTest` | The local tombstone is cleared when the server refuses the delete. |
+| `typing during a staged conflict keeps the note in CONFLICT` | `NoteTransactionsTest` | The badge — and the route to the resolution screen — survives a mid-conflict edit. |
+| `resolving after typing during the conflict` | `NoteTransactionsTest` | Both the parked and the newer pending op are superseded; the unique index is never violated. |
+| `typing before the note has loaded cannot overwrite it` | `NoteEditorViewModelTest` | A keystroke racing the first Room emission can't blank an existing note. |
 | `pull_skips_notes_with_pending_ops` | `NoteTransactionsTest`, `SyncEngineTest` | A remote change never clobbers a note being edited locally. |
 | `edit_during_in_flight_creates_second_op_and_loses_nothing` | `NoteTransactionsTest`, `SyncEngineTest` | A mid-flight edit lands in a new op; the ack deletes only the frozen one. |
 | `crash_between_send_and_ack_replays_safely` | `SyncEngineTest` | Stale `IN_FLIGHT` resets to `PENDING` and replays with the *same* `opId` — never a fabricated new one. |
 | `long_editing_session_produces_one_request_per_window` | `WorkManagerSyncTriggerTest` | 20 debounced schedule calls collapse to one `ENQUEUED` work item. |
 | FTS DAO tests | `NoteDaoFtsTest` (instrumented) | Search matches title/body, excludes deleted notes, reflects updates. |
+| `migrate1To2` | `MigrationTest` (instrumented) | Schema v1 → v2 preserves outbox rows and adds the rejection columns as nullable. |
 
-Plus `HttpSyncTransportTest` (7 tests, MockWebServer: serialization, status-code → exception mapping)
-and `BuildFtsMatchQueryTest` (6 tests: the FTS5 query-injection-safe prefix-match builder).
+Plus `HttpSyncTransportTest` (7 tests, MockWebServer: serialization, status-code → exception
+mapping), `BuildFtsMatchQueryTest` (6 tests: the FTS5 query-injection-safe prefix-match builder),
+`ConflictResolutionContentTest` (5 Robolectric Compose tests over the resolution screen), and
+`ArchitectureTest` (6 Konsist rules: `:domain` imports no framework types, ViewModels never take
+repositories, use cases stay in `domain.usecase`, and so on).
 
 Since this repo doesn't own backend semantics, `crash_between_send_and_ack_replays_safely` and
 `resolution_supersedes_parked_op` assert what's actually the *client's* responsibility — sending
@@ -309,6 +394,12 @@ Rich text (a structured format would force the merge layer to be re-litigated �
 project), real-time collaboration and CRDTs, attachments, end-to-end encryption, sharing between
 users, FCM push, KMP/iOS, and — deliberately — backend implementation of any kind. Each has a seam
 in the design above where it would attach.
+
+Also absent, and more of a genuine gap than the rest: there is no aggregate sync-status surface —
+no pending-op count, no "oldest unsynced edit", no last-successful-sync timestamp. Per-note state
+is visible on every row and failures are actionable in the editor, but nothing summarises the
+queue. `SyncMonitor` is the seam; it already receives every transport failure, token expiry and
+round outcome, and today only logs them.
 
 ## Tech stack
 

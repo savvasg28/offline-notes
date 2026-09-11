@@ -180,6 +180,15 @@ class NoteTransactionsTest {
         assertThat(remaining!!.status).isEqualTo(OutboxStatus.PENDING)
     }
 
+    private fun conflictPayload() = ConflictPayload(
+        baseVersion = "v0",
+        baseTitle = "Base Title",
+        baseBody = "Base Body",
+        remoteVersion = "v1",
+        remoteTitle = "Remote Title",
+        remoteBody = "Remote Body",
+    )
+
     @Test
     fun `conflict_parks_op_and_stages_all_three_inputs`() = runTest {
         transactions.write("note-1", "Local Title", "Local Body", now = 1000)
@@ -215,15 +224,97 @@ class NoteTransactionsTest {
     }
 
     @Test
-    fun `REJECTED deletes the op and returns it as a poison pill, never retried`() = runTest {
+    fun `a rejected op is parked as a poison pill, never retried, and never silently dropped`() = runTest {
         transactions.write("note-1", "T1", "B1", now = 1000)
         val opId = db.outboxDao().getPendingForNote("note-1")!!.opId
+        transactions.freeze()
 
-        val deleted = transactions.markRejected(opId)
+        transactions.markRejected(opId, code = "TOO_LARGE", message = "Body exceeds 64 KB.", now = 2000)
 
-        assertThat(deleted).isNotNull()
-        assertThat(deleted!!.opId).isEqualTo(opId)
+        val op = db.outboxDao().getById(opId)!!
+        assertThat(op.status).isEqualTo(OutboxStatus.REJECTED)
+        assertThat(op.rejectionCode).isEqualTo("TOO_LARGE")
+        assertThat(op.rejectionMessage).isEqualTo("Body exceeds 64 KB.")
+        assertThat(db.outboxDao().getPendingOpsOrderedByCreatedAt()).isEmpty()
+        assertThat(db.noteDao().getNote("note-1")!!.syncState).isEqualTo(SyncState.REJECTED)
+    }
+
+    @Test
+    fun `a rejected edit keeps its pull protection, so a remote change cannot overwrite it`() = runTest {
+        transactions.write("note-1", "T1", "B1", now = 1000)
+        val createId = db.outboxDao().getPendingForNote("note-1")!!.opId
+        transactions.freeze()
+        transactions.markApplied(createId, newVersion = "v1")
+
+        transactions.write("note-1", "Local edit", "Local body", now = 2000)
+        val rejectedId = db.outboxDao().getPendingForNote("note-1")!!.opId
+        transactions.freeze()
+        transactions.markRejected(rejectedId, code = "INVALID", message = "No.", now = 3000)
+
+        transactions.applyDelta(
+            listOf(RemoteNoteChange("note-1", version = "v2", isDeleted = false, title = "Server title", body = "Server body")),
+            newSyncToken = "t1",
+            now = 4000,
+        )
+
+        val note = db.noteDao().getNote("note-1")!!
+        assertThat(note.title).isEqualTo("Local edit")
+        assertThat(note.syncState).isEqualTo(SyncState.REJECTED)
+    }
+
+    @Test
+    fun `a rejected DELETE restores the note rather than leaving it invisible forever`() = runTest {
+        transactions.write("note-1", "T1", "B1", now = 1000)
+        val createId = db.outboxDao().getPendingForNote("note-1")!!.opId
+        transactions.freeze()
+        transactions.markApplied(createId, newVersion = "v1")
+
+        transactions.delete("note-1", now = 2000)
+        val deleteId = db.outboxDao().getPendingForNote("note-1")!!.opId
+        transactions.freeze()
+        transactions.markRejected(deleteId, code = "FORBIDDEN", message = "Not yours.", now = 3000)
+
+        val note = db.noteDao().getNote("note-1")!!
+        assertThat(note.isDeleted).isFalse()
+        assertThat(note.syncState).isEqualTo(SyncState.REJECTED)
+    }
+
+    @Test
+    fun `editing again supersedes a rejected op and returns the note to PENDING`() = runTest {
+        transactions.write("note-1", "T1", "B1", now = 1000)
+        val opId = db.outboxDao().getPendingForNote("note-1")!!.opId
+        transactions.freeze()
+        transactions.markRejected(opId, code = "INVALID", message = "No.", now = 2000)
+
+        transactions.write("note-1", "T2", "B2", now = 3000)
+
         assertThat(db.outboxDao().getById(opId)).isNull()
+        assertThat(db.outboxDao().getPendingForNote("note-1")).isNotNull()
+        assertThat(db.noteDao().getNote("note-1")!!.syncState).isEqualTo(SyncState.PENDING)
+    }
+
+    @Test
+    fun `discarding a rejected change drops the op and lets the next pull reconcile the note`() = runTest {
+        transactions.write("note-1", "T1", "B1", now = 1000)
+        val createId = db.outboxDao().getPendingForNote("note-1")!!.opId
+        transactions.freeze()
+        transactions.markApplied(createId, newVersion = "v1")
+
+        transactions.write("note-1", "Local edit", "Local body", now = 2000)
+        val rejectedId = db.outboxDao().getPendingForNote("note-1")!!.opId
+        transactions.freeze()
+        transactions.markRejected(rejectedId, code = "INVALID", message = "No.", now = 3000)
+
+        transactions.discardRejected("note-1")
+        assertThat(db.noteDao().getNote("note-1")!!.syncState).isEqualTo(SyncState.SYNCED)
+
+        transactions.applyDelta(
+            listOf(RemoteNoteChange("note-1", version = "v2", isDeleted = false, title = "Server title", body = "Server body")),
+            newSyncToken = "t1",
+            now = 4000,
+        )
+
+        assertThat(db.noteDao().getNote("note-1")!!.title).isEqualTo("Server title")
     }
 
     @Test
@@ -367,7 +458,8 @@ class NoteTransactionsTest {
 
         transactions.write("local-only", "T2", "B2", now = 2000)
 
-        transactions.applySnapshot(remoteNotes = emptyList(), newSyncToken = "boot-1", now = 3000)
+        transactions.applySnapshotPage(remoteNotes = emptyList(), now = 3000)
+        transactions.completeSnapshot(presentNoteIds = emptySet(), newSyncToken = "boot-1")
 
         assertThat(db.noteDao().getNote("gone-remotely")).isNull()
 
@@ -378,14 +470,82 @@ class NoteTransactionsTest {
     }
 
     @Test
-    fun `applySnapshot does not purge a note that still has a live op`() = runTest {
+    fun `a multi-page snapshot keeps every page, not only the last one`() = runTest {
+        for (id in listOf("note-1", "note-2")) {
+            transactions.write(id, "T-$id", "B-$id", now = 1000)
+            transactions.markApplied(db.outboxDao().getPendingForNote(id)!!.opId, newVersion = "v1")
+        }
+
+        val pageOne = listOf(RemoteNoteChange("note-1", "v2", isDeleted = false, title = "P1", body = "B1"))
+        val pageTwo = listOf(RemoteNoteChange("note-2", "v2", isDeleted = false, title = "P2", body = "B2"))
+
+        transactions.applySnapshotPage(pageOne, now = 3000)
+        transactions.applySnapshotPage(pageTwo, now = 3000)
+        transactions.completeSnapshot(presentNoteIds = setOf("note-1", "note-2"), newSyncToken = "boot-1")
+
+        assertThat(db.noteDao().getNote("note-1")!!.title).isEqualTo("P1")
+        assertThat(db.noteDao().getNote("note-2")!!.title).isEqualTo("P2")
+    }
+
+    @Test
+    fun `a snapshot advances the sync token only once every page has landed`() = runTest {
+        transactions.applySnapshotPage(
+            listOf(RemoteNoteChange("note-1", "v1", isDeleted = false, title = "P1", body = "B1")),
+            now = 1000,
+        )
+
+        assertThat(db.syncMetaDao().getSyncToken()).isNull()
+
+        transactions.completeSnapshot(presentNoteIds = setOf("note-1"), newSyncToken = "boot-1")
+
+        assertThat(db.syncMetaDao().getSyncToken()).isEqualTo("boot-1")
+    }
+
+    @Test
+    fun `typing during a staged conflict keeps the note in CONFLICT so the badge survives`() = runTest {
+        transactions.write("note-1", "Local Title", "Local Body", now = 1000)
+        val opId = db.outboxDao().getPendingForNote("note-1")!!.opId
+        transactions.freeze()
+        transactions.stageConflict(opId, conflictPayload(), detectedAt = 2000)
+
+        transactions.write("note-1", "Still typing", "Local Body", now = 3000)
+
+        val note = db.noteDao().getNote("note-1")!!
+        assertThat(note.syncState).isEqualTo(SyncState.CONFLICT)
+        assertThat(note.title).isEqualTo("Still typing")
+        assertThat(db.outboxDao().getById(opId)!!.status).isEqualTo(OutboxStatus.PARKED)
+        assertThat(db.conflictDao().getForNote("note-1")).isNotNull()
+    }
+
+    @Test
+    fun `resolving after typing during the conflict supersedes both ops instead of colliding`() = runTest {
+        transactions.write("note-1", "Local Title", "Local Body", now = 1000)
+        val parkedId = db.outboxDao().getPendingForNote("note-1")!!.opId
+        transactions.freeze()
+        transactions.stageConflict(parkedId, conflictPayload(), detectedAt = 2000)
+        transactions.write("note-1", "Still typing", "Local Body", now = 3000)
+
+        transactions.resolveConflict("note-1", "Merged Title", "Merged Body", now = 4000)
+
+        assertThat(db.outboxDao().getById(parkedId)).isNull()
+        assertThat(db.conflictDao().getForNote("note-1")).isNull()
+        assertThat(db.outboxDao().countForNote("note-1")).isEqualTo(1)
+
+        val note = db.noteDao().getNote("note-1")!!
+        assertThat(note.syncState).isEqualTo(SyncState.PENDING)
+        assertThat(note.title).isEqualTo("Merged Title")
+    }
+
+    @Test
+    fun `a snapshot does not purge a note that still has a live op`() = runTest {
         transactions.write("note-1", "T1", "B1", now = 1000)
         val opId = db.outboxDao().getPendingForNote("note-1")!!.opId
         transactions.markApplied(opId, newVersion = "1")
         transactions.write("note-1", "T2", "B2", now = 2000)
         transactions.freeze()
 
-        transactions.applySnapshot(remoteNotes = emptyList(), newSyncToken = "boot-1", now = 3000)
+        transactions.applySnapshotPage(remoteNotes = emptyList(), now = 3000)
+        transactions.completeSnapshot(presentNoteIds = emptySet(), newSyncToken = "boot-1")
 
         assertThat(db.noteDao().getNote("note-1")).isNotNull()
     }

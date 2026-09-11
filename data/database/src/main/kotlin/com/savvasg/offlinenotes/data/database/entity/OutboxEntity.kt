@@ -30,4 +30,6 @@ data class OutboxEntity(
     val status: OutboxStatus,
     val createdAt: Long,
     val attemptCount: Int,
+    val rejectionCode: String? = null,
+    val rejectionMessage: String? = null,
 )

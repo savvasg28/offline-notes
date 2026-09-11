@@ -39,6 +39,21 @@ interface OutboxDao {
     @Query("SELECT EXISTS(SELECT 1 FROM outbox WHERE noteId = :noteId AND status = 'PARKED')")
     suspend fun hasParked(noteId: String): Boolean
 
+    @Query("SELECT EXISTS(SELECT 1 FROM outbox WHERE noteId = :noteId AND status = 'REJECTED')")
+    suspend fun hasRejected(noteId: String): Boolean
+
+    @Query("SELECT * FROM outbox WHERE noteId = :noteId AND status = 'REJECTED' LIMIT 1")
+    fun observeRejectedForNote(noteId: String): Flow<OutboxEntity?>
+
+    @Query(
+        "UPDATE outbox SET status = 'REJECTED', rejectionCode = :code, rejectionMessage = :message " +
+            "WHERE opId = :opId",
+    )
+    suspend fun markRejected(opId: String, code: String, message: String)
+
+    @Query("DELETE FROM outbox WHERE noteId = :noteId AND status = 'REJECTED'")
+    suspend fun deleteRejectedForNote(noteId: String)
+
     @Query("UPDATE outbox SET status = 'PENDING', attemptCount = attemptCount + 1 WHERE status = 'IN_FLIGHT'")
     suspend fun resetInFlightToPending()
 

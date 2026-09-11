@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import com.savvasg.offlinenotes.domain.ApplicationScope
 import com.savvasg.offlinenotes.domain.model.SyncState
+import com.savvasg.offlinenotes.domain.usecase.DiscardRejectedChangeUseCase
 import com.savvasg.offlinenotes.domain.usecase.ObserveNoteUseCase
 import com.savvasg.offlinenotes.domain.usecase.RequestSyncUseCase
 import com.savvasg.offlinenotes.domain.usecase.SaveNoteUseCase
@@ -20,9 +21,11 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class NoteEditorUiState(
+    val isLoading: Boolean = true,
     val title: String = "",
     val body: String = "",
     val syncState: SyncState? = null,
+    val rejectionMessage: String? = null,
 )
 
 @HiltViewModel
@@ -30,7 +33,8 @@ class NoteEditorViewModel @Inject constructor(
     observeNote: ObserveNoteUseCase,
     private val saveNote: SaveNoteUseCase,
     private val requestSync: RequestSyncUseCase,
-    @ApplicationScope private val applicationScope: CoroutineScope,
+    private val discardRejectedChange: DiscardRejectedChangeUseCase,
+    @param:ApplicationScope private val applicationScope: CoroutineScope,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -45,14 +49,18 @@ class NoteEditorViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             observeNote(noteId).collect { note ->
-                if (note == null) return@collect
+                if (note == null) {
+                    mutableUiState.update { it.copy(isLoading = false) }
+                    return@collect
+                }
                 noteExists = true
                 mutableUiState.update { current ->
-                    if (userOwnsContent) {
-                        current.copy(syncState = note.syncState)
-                    } else {
-                        current.copy(title = note.title, body = note.body, syncState = note.syncState)
-                    }
+                    val status = current.copy(
+                        isLoading = false,
+                        syncState = note.syncState,
+                        rejectionMessage = note.rejection?.message,
+                    )
+                    if (userOwnsContent) status else status.copy(title = note.title, body = note.body)
                 }
             }
         }
@@ -62,11 +70,16 @@ class NoteEditorViewModel @Inject constructor(
 
     fun onBodyChange(value: String) = edit { it.copy(body = value) }
 
+    fun onDiscardRejected() {
+        applicationScope.launch { discardRejectedChange(noteId) }
+    }
+
     fun onEditorClosed() {
         if (userOwnsContent) requestSync()
     }
 
     private fun edit(transform: (NoteEditorUiState) -> NoteEditorUiState) {
+        if (mutableUiState.value.isLoading) return
         userOwnsContent = true
         val edited = mutableUiState.updateAndGet(transform)
         if (!noteExists && edited.title.isBlank() && edited.body.isBlank()) return

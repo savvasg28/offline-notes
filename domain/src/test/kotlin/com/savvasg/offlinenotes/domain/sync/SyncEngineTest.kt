@@ -94,9 +94,45 @@ class SyncEngineTest {
         engine(operations).sync()
 
         assertThat(monitor.tokenExpiries).isEqualTo(1)
-        assertThat(operations.appliedSnapshots).hasSize(1)
+        assertThat(operations.snapshotPages).hasSize(1)
+        assertThat(operations.completedSnapshots).containsExactly(setOf("a") to "fresh")
         assertThat(operations.appliedDeltas).isEmpty()
         assertThat(transport.pullCursors).containsExactly("stale", null).inOrder()
+    }
+
+    @Test
+    fun `a multi-page snapshot sweeps once, against the union of every page`() = runTest {
+        val operations = RecordingSyncOperations(startingToken = "stale")
+        transport.expireTokenOnce = true
+        transport.pages = mutableListOf(
+            RemoteChangePage(listOf(change("a")), nextSyncToken = "cursor-1", hasMore = true),
+            RemoteChangePage(listOf(change("b")), nextSyncToken = "cursor-2", hasMore = true),
+            RemoteChangePage(listOf(change("c")), nextSyncToken = "fresh", hasMore = false),
+        )
+
+        engine(operations).sync()
+
+        assertThat(operations.snapshotPages).hasSize(3)
+        assertThat(operations.completedSnapshots)
+            .containsExactly(setOf("a", "b", "c") to "fresh")
+        assertThat(transport.pullCursors)
+            .containsExactly("stale", null, "cursor-1", "cursor-2").inOrder()
+    }
+
+    @Test
+    fun `an interrupted snapshot never advances the sync token`() = runTest {
+        val operations = RecordingSyncOperations(startingToken = "stale")
+        transport.expireTokenOnce = true
+        transport.pages = mutableListOf(
+            RemoteChangePage(listOf(change("a")), nextSyncToken = "cursor-1", hasMore = true),
+        )
+        transport.failPullAfterPages = 1
+
+        engine(operations).sync()
+
+        assertThat(operations.snapshotPages).hasSize(1)
+        assertThat(operations.completedSnapshots).isEmpty()
+        assertThat(monitor.outcomes).containsExactly(SyncOutcome.TransportFailure)
     }
 
     @Test

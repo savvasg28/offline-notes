@@ -70,10 +70,13 @@ class StatusColors internal constructor(
     val synced: Color,
     val pending: Color,
     val conflict: Color,
+    val rejected: Color,
 )
 
 private val LocalStatusColors: ProvidableCompositionLocal<StatusColors> =
-    staticCompositionLocalOf { StatusColors(Color.Unspecified, Color.Unspecified, Color.Unspecified) }
+    staticCompositionLocalOf {
+        StatusColors(Color.Unspecified, Color.Unspecified, Color.Unspecified, Color.Unspecified)
+    }
 
 object OfflineNotesTheme {
     val statusColors: StatusColors
@@ -90,6 +93,7 @@ fun OfflineNotesTheme(
         synced = colorScheme.tertiary,
         pending = colorScheme.secondary,
         conflict = colorScheme.error,
+        rejected = colorScheme.error,
     )
     CompositionLocalProvider(LocalStatusColors provides statusColors) {
         MaterialTheme(

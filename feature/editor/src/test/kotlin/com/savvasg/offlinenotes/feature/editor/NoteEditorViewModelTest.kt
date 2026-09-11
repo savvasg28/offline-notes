@@ -4,9 +4,11 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.navigation.testing.invoke
 import com.google.common.truth.Truth.assertThat
 import com.savvasg.offlinenotes.domain.model.Note
+import com.savvasg.offlinenotes.domain.model.RejectionReason
 import com.savvasg.offlinenotes.domain.model.SyncState
 import com.savvasg.offlinenotes.domain.repository.NoteRepository
 import com.savvasg.offlinenotes.domain.sync.SyncTrigger
+import com.savvasg.offlinenotes.domain.usecase.DiscardRejectedChangeUseCase
 import com.savvasg.offlinenotes.domain.usecase.ObserveNoteUseCase
 import com.savvasg.offlinenotes.domain.usecase.RequestSyncUseCase
 import com.savvasg.offlinenotes.domain.usecase.SaveNoteUseCase
@@ -17,7 +19,7 @@ import io.mockk.verify
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -34,17 +36,19 @@ class NoteEditorViewModelTest {
 
     private val repository = mockk<NoteRepository>(relaxed = true)
     private val syncTrigger = mockk<SyncTrigger>(relaxed = true)
-    private val note = MutableStateFlow<Note?>(null)
+    private val note = MutableSharedFlow<Note?>(replay = 1)
     private lateinit var viewModel: NoteEditorViewModel
 
     @Before
     fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         every { repository.observeNote("note-1") } returns note
+        note.tryEmit(null)
         viewModel = NoteEditorViewModel(
             ObserveNoteUseCase(repository),
             SaveNoteUseCase(repository),
             RequestSyncUseCase(syncTrigger),
+            DiscardRejectedChangeUseCase(repository),
             CoroutineScope(UnconfinedTestDispatcher()),
             SavedStateHandle(route = EditorRoute("note-1")),
         )
@@ -55,8 +59,12 @@ class NoteEditorViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun note(title: String, body: String, syncState: SyncState) =
-        Note("note-1", title, body, syncState, isDeleted = false, createdAt = 0, lastUpdated = 0)
+    private fun note(
+        title: String,
+        body: String,
+        syncState: SyncState,
+        rejection: RejectionReason? = null,
+    ) = Note("note-1", title, body, syncState, isDeleted = false, createdAt = 0, lastUpdated = 0, rejection = rejection)
 
     @Test
     fun `every edit is written through, with no debounce to wait out`() = runTest {
@@ -79,10 +87,10 @@ class NoteEditorViewModelTest {
 
     @Test
     fun `a conflict arriving mid-edit updates status without overwriting what the user typed`() = runTest {
-        note.value = note("Server title", "Server body", SyncState.SYNCED)
+        note.tryEmit(note("Server title", "Server body", SyncState.SYNCED))
         viewModel.onTitleChange("My edit")
 
-        note.value = note("Device B title", "Device B body", SyncState.CONFLICT)
+        note.tryEmit(note("Device B title", "Device B body", SyncState.CONFLICT))
 
         assertThat(viewModel.uiState.value.title).isEqualTo("My edit")
         assertThat(viewModel.uiState.value.syncState).isEqualTo(SyncState.CONFLICT)
@@ -90,10 +98,51 @@ class NoteEditorViewModelTest {
 
     @Test
     fun `an existing note seeds the editor before the user touches it`() = runTest {
-        note.value = note("Server title", "Server body", SyncState.SYNCED)
+        note.tryEmit(note("Server title", "Server body", SyncState.SYNCED))
 
         assertThat(viewModel.uiState.value.title).isEqualTo("Server title")
         assertThat(viewModel.uiState.value.body).isEqualTo("Server body")
+    }
+
+    @Test
+    fun `typing before the note has loaded cannot overwrite it`() = runTest {
+        val unloaded = MutableSharedFlow<Note?>(replay = 1)
+        every { repository.observeNote("note-2") } returns unloaded
+        val subject = NoteEditorViewModel(
+            ObserveNoteUseCase(repository),
+            SaveNoteUseCase(repository),
+            RequestSyncUseCase(syncTrigger),
+            DiscardRejectedChangeUseCase(repository),
+            CoroutineScope(UnconfinedTestDispatcher()),
+            SavedStateHandle(route = EditorRoute("note-2")),
+        )
+
+        subject.onTitleChange("X")
+        unloaded.tryEmit(
+            Note("note-2", "Server title", "Server body", SyncState.SYNCED, false, 0, 0),
+        )
+
+        assertThat(subject.uiState.value.title).isEqualTo("Server title")
+        coVerify(exactly = 0) { repository.saveNote(any(), any(), any()) }
+    }
+
+    @Test
+    fun `a rejection surfaces the server's reason alongside the state`() = runTest {
+        note.tryEmit(
+            note("T", "B", SyncState.REJECTED, RejectionReason("TOO_LARGE", "Body exceeds 64 KB.")),
+        )
+
+        assertThat(viewModel.uiState.value.syncState).isEqualTo(SyncState.REJECTED)
+        assertThat(viewModel.uiState.value.rejectionMessage).isEqualTo("Body exceeds 64 KB.")
+    }
+
+    @Test
+    fun `discarding a rejected change reaches the repository`() = runTest {
+        note.tryEmit(note("T", "B", SyncState.REJECTED, RejectionReason("INVALID", "No.")))
+
+        viewModel.onDiscardRejected()
+
+        coVerify(exactly = 1) { repository.discardRejectedChange("note-1") }
     }
 
     @Test
