@@ -37,7 +37,7 @@ actually guarantees, and where each one stops.
 
 | Concern | What is guaranteed | What is **not** |
 |---|---|---|
-| Local durability | A committed edit survives process death. The write is a single transaction and returns before the UI is told. | Nothing about the server having seen it. |
+| Local durability | A committed edit survives process death, and survives the screen that made it — a user write outlives the ViewModel that started it. | Nothing about the server having seen it. Process death mid-write still costs that write. |
 | Retry safety | A given `opId` always names the byte-identical operation. A frozen op is immutable; later edits go to a new row. | Server-side dedupe. The client sends a stable idempotency key; honouring it is the server's half of the contract. |
 | Local-edit protection | Remote state never overwrites a note with an unresolved local op — pending, in-flight, parked on a conflict, or rejected. | Notes with no live op, which a pull is free to update. |
 | Convergence | Given eventual connectivity, a conforming server, and conflicts the user has resolved, replicas converge. | Convergence while a conflict sits unresolved, or against a server that ignores `baseVersion`. |
@@ -148,6 +148,14 @@ engine only ever sees `NoteSyncOperations` — it is *structurally incapable* of
 `saveNote()`, because that method isn't on the interface it holds a reference to. If the sync
 engine generated an outbox op from pulled data, it would echo the server's own changes back at it;
 the split makes that particular mistake unwriteable.
+
+The split carries a second rule, about lifetime. `NoteRepository` writes are user-initiated, so
+they must not die with the screen: each one runs on an injected application-scoped `CoroutineScope`
+via a single `durable { }` helper, so cancelling the caller stops the caller waiting without
+stopping the write. `NoteSyncOperations` writes deliberately get no such treatment — the outbox
+makes them resumable, so a stopped worker *should* stop syncing, and `resetStaleInFlight` recovers
+whatever was in flight. Same class, two interfaces, opposite cancellation semantics, and the
+interface you hold tells you which you get.
 
 That is the whole of what the type system buys, and it is worth being exact about it. Invariant 2
 has two halves: *push responses never write content* is structural and holds at compile time; *remote

@@ -16,7 +16,6 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -49,7 +48,6 @@ class NoteEditorViewModelTest {
             SaveNoteUseCase(repository),
             RequestSyncUseCase(syncTrigger),
             DiscardRejectedChangeUseCase(repository),
-            CoroutineScope(UnconfinedTestDispatcher()),
             SavedStateHandle(route = EditorRoute("note-1")),
         )
     }
@@ -113,7 +111,6 @@ class NoteEditorViewModelTest {
             SaveNoteUseCase(repository),
             RequestSyncUseCase(syncTrigger),
             DiscardRejectedChangeUseCase(repository),
-            CoroutineScope(UnconfinedTestDispatcher()),
             SavedStateHandle(route = EditorRoute("note-2")),
         )
 

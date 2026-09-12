@@ -4,14 +4,12 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
-import com.savvasg.offlinenotes.domain.ApplicationScope
 import com.savvasg.offlinenotes.domain.model.SyncState
 import com.savvasg.offlinenotes.domain.usecase.DiscardRejectedChangeUseCase
 import com.savvasg.offlinenotes.domain.usecase.ObserveNoteUseCase
 import com.savvasg.offlinenotes.domain.usecase.RequestSyncUseCase
 import com.savvasg.offlinenotes.domain.usecase.SaveNoteUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,7 +32,6 @@ class NoteEditorViewModel @Inject constructor(
     private val saveNote: SaveNoteUseCase,
     private val requestSync: RequestSyncUseCase,
     private val discardRejectedChange: DiscardRejectedChangeUseCase,
-    @param:ApplicationScope private val applicationScope: CoroutineScope,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -71,7 +68,7 @@ class NoteEditorViewModel @Inject constructor(
     fun onBodyChange(value: String) = edit { it.copy(body = value) }
 
     fun onDiscardRejected() {
-        applicationScope.launch { discardRejectedChange(noteId) }
+        viewModelScope.launch { discardRejectedChange(noteId) }
     }
 
     fun onEditorClosed() {
@@ -84,8 +81,6 @@ class NoteEditorViewModel @Inject constructor(
         val edited = mutableUiState.updateAndGet(transform)
         if (!noteExists && edited.title.isBlank() && edited.body.isBlank()) return
         noteExists = true
-        applicationScope.launch {
-            saveNote(noteId, edited.title, edited.body)
-        }
+        viewModelScope.launch { saveNote(noteId, edited.title, edited.body) }
     }
 }
