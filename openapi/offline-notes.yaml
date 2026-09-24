@@ -16,9 +16,9 @@ info:
     - **Idempotency.** `opId` is the idempotency key. A replayed `opId` returns the stored original
       result and must not re-execute the operation. Clients replay after a crash or a dropped
       response, so this is what keeps a retry from double-applying an edit.
-    - **Results versus failures.** `Conflict` and `Rejected` are 200 results. Auth failure, rate
-      limiting, and server errors are HTTP failures, and the client retries the whole batch with the
-      same `opId`s.
+    - **Results versus failures.** `Conflict` and `Rejected` are 200 results. Rate limiting and
+      server errors are HTTP failures, and the client retries the whole batch with the same `opId`s.
+      Auth failure (401) is terminal for the round: the client stops and does not retry.
     - **Opaque cursor.** `syncToken` is stored, echoed back, and never parsed by the client. Its
       format is the server's business entirely.
     - **Compare-and-swap.** An op whose `baseVersion` does not match the note's current server-side
@@ -172,7 +172,7 @@ paths:
 components:
   responses:
     AuthFailure:
-      description: Authentication failed. The client retries the whole batch with the same opIds.
+      description: Authentication failed. The client ends the sync round without retrying.
     RateLimited:
       description: Rate limited. The client retries the whole batch with the same opIds.
     ServerError:
@@ -272,8 +272,8 @@ components:
     OpResultRejected:
       type: object
       description: |
-        The op will never succeed as submitted. The client drops it rather than retrying, so this is
-        for permanent refusals, not transient failure.
+        The op will never succeed as submitted. The client never retries it; it keeps the op parked
+        with the reason so the user can edit again or discard. For permanent refusals only.
       additionalProperties: false
       required: [type, opId, code, message]
       properties:
