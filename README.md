@@ -310,9 +310,6 @@ Release-variant unit tests are disabled in the convention plugins: they ran the 
 the debug ones (no R8 is involved in a unit test) while lacking the debug-only Compose test
 manifest.
 
-CI (`.github/workflows/ci.yml`) runs both on every push: a plain JVM job for the unit tests, and a
-`reactivecircus/android-emulator-runner` job for the instrumented ones.
-
 Named scenario tests, each corresponding to a real defect found while designing this system:
 
 | Test | Where | Asserts |
