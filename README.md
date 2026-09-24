@@ -287,9 +287,15 @@ The debug build points at `http://10.0.2.2:8080/` (the emulator's alias for the 
 `BuildConfig.API_BASE_URL`; change that value in `app/build.gradle.kts` to target a physical
 device at the host's LAN IP, or a real backend.
 
-Enable Mockoon's Conflict response for `POST /push` (or add a rule keyed on `noteId`), edit that
-note locally, and the conflict banner appears on the next sync. Run two app instances against the
-same Mockoon instance to watch two devices converge on shared state.
+Each route ships several responses; enable one at a time in the Mockoon UI:
+
+- **Conflict** on `POST /push`, then edit a note — the conflict banner appears on the next sync.
+- **Rejected** on `POST /push` — the note shows *Not saved* with the server's reason and a Discard action.
+- **Remote change** on `GET /pull`, then foreground the app — a note edited "elsewhere" arrives.
+- **410** on `GET /pull` — the client discards its token and re-bootstraps from a snapshot.
+
+Mockoon is stateless — it never stores a push — so it can drive every client-side path but cannot
+show two devices converging. That needs a conforming server, and this repo ships only the client.
 
 **Scenario tests** (see below) exercise every one of these paths without a UI at all.
 

@@ -11,7 +11,7 @@
     {
       "uuid": "4a2b3c4d-5e6f-4a1b-9c2d-3e4f5a6b7c8d",
       "type": "http",
-      "documentation": "Health check — used by the two-device demo script to wait for the server to be ready.",
+      "documentation": "Health check \u2014 used by the two-device demo script to wait for the server to be ready.",
       "method": "get",
       "endpoint": "health",
       "responses": [
@@ -39,7 +39,7 @@
     {
       "uuid": "6c4d5e6f-7a8b-4c3d-9e4f-5a6b7c8d9e0f",
       "type": "http",
-      "documentation": "Push (§7 wire contract): request body is a raw JSON array of OutgoingOp. This starter response applies every op in the batch — swap in the Conflict/Rejected examples below (or add your own rules) to script a specific scenario. This repo owns the client only; scripting real per-op / per-batch logic here is the whole point of pointing HttpTransport at Mockoon instead of a repo-owned server.",
+      "documentation": "Push (\u00a77 wire contract): request body is a raw JSON array of OutgoingOp. This starter response applies every op in the batch \u2014 swap in the Conflict/Rejected examples below (or add your own rules) to script a specific scenario. This repo owns the client only; scripting real per-op / per-batch logic here is the whole point of pointing HttpTransport at Mockoon instead of a repo-owned server.",
       "method": "post",
       "endpoint": "push",
       "responses": [
@@ -48,8 +48,13 @@
           "body": "[{\"type\":\"Applied\",\"opId\":\"{{body '0.opId'}}\",\"newVersion\":\"{{faker 'number.int' min=1 max=9999}}\"}]",
           "latency": 0,
           "statusCode": 200,
-          "label": "Applied (default) — single-op happy path",
-          "headers": [{ "key": "Content-Type", "value": "application/json" }],
+          "label": "Applied (default) \u2014 single-op happy path",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
           "bodyType": "INLINE",
           "filePath": "",
           "databucketID": "",
@@ -65,8 +70,13 @@
           "body": "[{\"type\":\"Conflict\",\"opId\":\"{{body '0.opId'}}\",\"baseVersion\":null,\"baseTitle\":null,\"baseBody\":null,\"remoteVersion\":\"2\",\"remoteTitle\":\"Edited on another device\",\"remoteBody\":\"This is the remote content the client should stage as a conflict.\"}]",
           "latency": 0,
           "statusCode": 200,
-          "label": "Conflict — enable to demo conflict resolution",
-          "headers": [{ "key": "Content-Type", "value": "application/json" }],
+          "label": "Conflict \u2014 enable to demo conflict resolution",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
           "bodyType": "INLINE",
           "filePath": "",
           "databucketID": "",
@@ -82,8 +92,13 @@
           "body": "[{\"type\":\"Rejected\",\"opId\":\"{{body '0.opId'}}\",\"code\":\"SIMULATED_REJECTION\",\"message\":\"Rejected by Mockoon\"}]",
           "latency": 0,
           "statusCode": 200,
-          "label": "Rejected — enable to demo the poison-pill path",
-          "headers": [{ "key": "Content-Type", "value": "application/json" }],
+          "label": "Rejected \u2014 enable to demo the poison-pill path",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
           "bodyType": "INLINE",
           "filePath": "",
           "databucketID": "",
@@ -99,7 +114,7 @@
           "body": "",
           "latency": 0,
           "statusCode": 401,
-          "label": "Auth failure — 401",
+          "label": "Auth failure \u2014 401",
           "headers": [],
           "bodyType": "INLINE",
           "filePath": "",
@@ -116,7 +131,7 @@
           "body": "",
           "latency": 0,
           "statusCode": 429,
-          "label": "Rate limited — 429",
+          "label": "Rate limited \u2014 429",
           "headers": [],
           "bodyType": "INLINE",
           "filePath": "",
@@ -135,7 +150,7 @@
     {
       "uuid": "c2ad1e2f-3041-4293-f4af-1a2b3c4d5e6f",
       "type": "http",
-      "documentation": "Pull (§6/§7 wire contract): `since` is a query param, echoed back opaque. Default response is an empty bootstrap/incremental page — add a rule matching `since` to script a specific delta.",
+      "documentation": "Pull (\u00a76/\u00a77 wire contract): `since` is a query param, echoed back opaque. Default response is an empty bootstrap/incremental page \u2014 add a rule matching `since` to script a specific delta.",
       "method": "get",
       "endpoint": "pull",
       "responses": [
@@ -145,7 +160,12 @@
           "latency": 0,
           "statusCode": 200,
           "label": "Empty page (default)",
-          "headers": [{ "key": "Content-Type", "value": "application/json" }],
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
           "bodyType": "INLINE",
           "filePath": "",
           "databucketID": "",
@@ -157,11 +177,33 @@
           "default": true
         },
         {
+          "uuid": "baab2d05-43c9-4103-9461-dbfa699957f0",
+          "body": "{\"notes\": [{\"noteId\": \"demo-note\", \"version\": \"{{faker 'number.int' min=1000 max=9999}}\", \"deleted\": false, \"title\": \"Edited elsewhere\", \"body\": \"This version came from another device.\"}], \"nextSyncToken\": \"{{faker 'number.int' min=1 max=9999}}\", \"hasMore\": false}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "Remote change \u2014 enable to pull an edit from \"another device\"",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false
+        },
+        {
           "uuid": "e4cf3041-5263-44b5-16c1-3c4d5e6f7a8b",
           "body": "",
           "latency": 0,
           "statusCode": 410,
-          "label": "Token expired — 410 (client re-bootstraps)",
+          "label": "Token expired \u2014 410 (client re-bootstraps)",
           "headers": [],
           "bodyType": "INLINE",
           "filePath": "",
@@ -191,7 +233,12 @@
     "passphrase": ""
   },
   "cors": true,
-  "headers": [{ "key": "Content-Type", "value": "application/json" }],
+  "headers": [
+    {
+      "key": "Content-Type",
+      "value": "application/json"
+    }
+  ],
   "proxyReqHeaders": [],
   "proxyResHeaders": [],
   "data": []
