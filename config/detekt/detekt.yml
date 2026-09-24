@@ -3,7 +3,7 @@ build:
 
 complexity:
   LongParameterList:
-    ignoreAnnotated: ['Composable', 'Inject']
+    ignoreAnnotated: ['Composable']
   LongMethod:
     threshold: 80
     ignoreAnnotated: ['Composable']

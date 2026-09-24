@@ -15,10 +15,7 @@ import com.savvasg.offlinenotes.domain.sync.RemoteChangePage
 import com.savvasg.offlinenotes.domain.sync.SyncEngine
 import com.savvasg.offlinenotes.domain.sync.SyncOutcome
 import io.mockk.mockk
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
@@ -26,7 +23,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class SyncEngineTest {
 
@@ -50,7 +46,6 @@ class SyncEngineTest {
             db.syncMetaDao(),
             transactions,
             mockk(relaxed = true),
-            CoroutineScope(UnconfinedTestDispatcher()),
         )
         transport = FakeTransport()
         engine = SyncEngine(repository, transport, mockk(relaxed = true))

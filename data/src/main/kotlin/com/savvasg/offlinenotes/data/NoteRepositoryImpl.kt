@@ -8,7 +8,6 @@ import com.savvasg.offlinenotes.data.database.dao.SyncMetaDao
 import com.savvasg.offlinenotes.data.database.dao.searchActiveNotes
 import com.savvasg.offlinenotes.data.database.entity.NoteEntity
 import com.savvasg.offlinenotes.data.database.entity.OutboxEntity
-import com.savvasg.offlinenotes.domain.ApplicationScope
 import com.savvasg.offlinenotes.domain.model.ConflictPayload
 import com.savvasg.offlinenotes.domain.model.FrozenOutboxOp
 import com.savvasg.offlinenotes.domain.model.Note
@@ -20,8 +19,6 @@ import com.savvasg.offlinenotes.domain.repository.NoteRepository
 import com.savvasg.offlinenotes.domain.repository.NoteSyncOperations
 import com.savvasg.offlinenotes.domain.repository.OpAcknowledgement
 import com.savvasg.offlinenotes.domain.sync.SyncTrigger
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -36,11 +33,7 @@ class NoteRepositoryImpl @Inject constructor(
     private val syncMetaDao: SyncMetaDao,
     private val transactions: NoteTransactions,
     private val syncTrigger: SyncTrigger,
-    @param:ApplicationScope private val applicationScope: CoroutineScope,
 ) : NoteRepository, NoteSyncOperations {
-
-    private suspend fun <T> durable(block: suspend () -> T): T =
-        applicationScope.async { block() }.await()
 
     override fun observeNotes(): Flow<List<NoteSummary>> =
         noteDao.observeActiveNotes().map { notes -> notes.map { it.toSummary() } }
@@ -50,22 +43,22 @@ class NoteRepositoryImpl @Inject constructor(
             note?.toDomain(rejected?.toRejectionReason())
         }
 
-    override suspend fun saveNote(id: String, title: String, body: String) = durable {
+    override suspend fun saveNote(id: String, title: String, body: String) {
         transactions.write(id, title, body, now = System.currentTimeMillis())
         syncTrigger.requestSync()
     }
 
-    override suspend fun deleteNote(id: String) = durable {
+    override suspend fun deleteNote(id: String) {
         transactions.delete(id, now = System.currentTimeMillis())
         syncTrigger.requestSync()
     }
 
-    override suspend fun resolveConflict(noteId: String, title: String, body: String) = durable {
+    override suspend fun resolveConflict(noteId: String, title: String, body: String) {
         transactions.resolveConflict(noteId, title, body, now = System.currentTimeMillis())
         syncTrigger.requestSync()
     }
 
-    override suspend fun discardRejectedChange(noteId: String) = durable {
+    override suspend fun discardRejectedChange(noteId: String) {
         transactions.discardRejected(noteId)
         syncTrigger.requestSync()
     }

@@ -10,12 +10,14 @@ import com.savvasg.offlinenotes.domain.usecase.ObserveNoteUseCase
 import com.savvasg.offlinenotes.domain.usecase.RequestSyncUseCase
 import com.savvasg.offlinenotes.domain.usecase.SaveNoteUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 data class NoteEditorUiState(
@@ -68,7 +70,7 @@ class NoteEditorViewModel @Inject constructor(
     fun onBodyChange(value: String) = edit { it.copy(body = value) }
 
     fun onDiscardRejected() {
-        viewModelScope.launch { discardRejectedChange(noteId) }
+        viewModelScope.launch { withContext(NonCancellable) { discardRejectedChange(noteId) } }
     }
 
     fun onEditorClosed() {
@@ -81,6 +83,6 @@ class NoteEditorViewModel @Inject constructor(
         val edited = mutableUiState.updateAndGet(transform)
         if (!noteExists && edited.title.isBlank() && edited.body.isBlank()) return
         noteExists = true
-        viewModelScope.launch { saveNote(noteId, edited.title, edited.body) }
+        viewModelScope.launch { withContext(NonCancellable) { saveNote(noteId, edited.title, edited.body) } }
     }
 }
