@@ -8,10 +8,13 @@
     <application
         android:name=".OfflineNotesApplication"
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.OfflineNotes">
+        android:theme="@style/Theme.OfflineNotes"
+        tools:targetApi="31">
 
         <provider
             android:name="androidx.startup.InitializationProvider"

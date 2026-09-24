@@ -33,3 +33,9 @@ subprojects {
         }
     }
 }
+
+tasks.register("detektAll") {
+    group = "verification"
+    description = "Runs detekt with type resolution on every module's production sources."
+    dependsOn(subprojects.map { sp -> sp.tasks.matching { it.name == "detektMain" || it.name == "detektDebug" } })
+}

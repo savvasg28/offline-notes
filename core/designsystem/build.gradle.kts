@@ -15,6 +15,10 @@ android {
     buildFeatures {
         compose = true
     }
+
+    lint {
+        disable += "ComposeCompositionLocalUsage"
+    }
 }
 
 dependencies {

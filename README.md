@@ -304,6 +304,7 @@ show two devices converging. That needs a conforming server, and this repo ships
 
 ```bash
 ./gradlew test                      # 92 tests, across every module that has any
+./gradlew lint detektAll            # Android Lint (warnings are errors) + detekt with type resolution
 ./gradlew connectedDebugAndroidTest # 5 tests (:data:database), needs a device/emulator
 ```
 

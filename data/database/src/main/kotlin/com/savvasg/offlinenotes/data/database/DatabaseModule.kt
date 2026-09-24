@@ -21,6 +21,7 @@ object DatabaseModule {
 
     @Provides
     @Singleton
+    @Suppress("InjectDispatcher")
     fun provideDatabase(@ApplicationContext context: Context): OfflineNotesDatabase =
         Room.databaseBuilder(context, OfflineNotesDatabase::class.java, OfflineNotesDatabase.DB_NAME)
             .setDriver(BundledSQLiteDriver())

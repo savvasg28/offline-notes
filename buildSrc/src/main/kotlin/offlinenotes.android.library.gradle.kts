@@ -30,6 +30,12 @@ android {
             isReturnDefaultValues = true
         }
     }
+
+    lint {
+        warningsAsErrors = true
+        abortOnError = true
+        disable += setOf("GradleDependency", "AndroidGradlePluginVersion", "NewerVersionAvailable")
+    }
 }
 
 androidComponents {

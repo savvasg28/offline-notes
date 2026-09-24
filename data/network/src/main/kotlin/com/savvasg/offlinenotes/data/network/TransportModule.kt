@@ -9,7 +9,7 @@ import dagger.hilt.components.SingletonComponent
 
 @Module
 @InstallIn(SingletonComponent::class)
-abstract class TransportModule {
+interface TransportModule {
     @Binds
-    abstract fun bindSyncTransport(impl: HttpSyncTransport): SyncTransport
+    fun bindSyncTransport(impl: HttpSyncTransport): SyncTransport
 }

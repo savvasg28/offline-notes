@@ -36,7 +36,7 @@ class NoteRepositoryImpl @Inject constructor(
 ) : NoteRepository, NoteSyncOperations {
 
     override fun observeNotes(): Flow<List<NoteSummary>> =
-        noteDao.observeActiveNotes().map { notes -> notes.map { it.toSummary() } }
+        noteDao.observeActiveNotes().map { notes -> notes.map(NoteEntity::toSummary) }
 
     override fun observeNote(id: String): Flow<Note?> =
         combine(noteDao.observeNote(id), outboxDao.observeRejectedForNote(id)) { note, rejected ->

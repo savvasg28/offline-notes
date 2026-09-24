@@ -22,10 +22,10 @@ object WorkManagerModule {
 
 @Module
 @InstallIn(SingletonComponent::class)
-abstract class SyncTriggerModule {
+interface SyncTriggerModule {
     @Binds
-    abstract fun bindSyncTrigger(impl: WorkManagerSyncTrigger): SyncTrigger
+    fun bindSyncTrigger(impl: WorkManagerSyncTrigger): SyncTrigger
 
     @Binds
-    abstract fun bindSyncMonitor(impl: AndroidSyncMonitor): SyncMonitor
+    fun bindSyncMonitor(impl: AndroidSyncMonitor): SyncMonitor
 }
