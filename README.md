@@ -48,6 +48,9 @@ Android, and any design claiming one is describing the happy path.
 
 ## Architecture
 
+![High-level architecture](docs/architecture.png)
+
+
 ```mermaid
 flowchart LR
     subgraph Device
