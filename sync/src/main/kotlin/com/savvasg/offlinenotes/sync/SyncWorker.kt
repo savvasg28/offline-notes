@@ -24,5 +24,6 @@ class SyncWorker @AssistedInject constructor(
             Result.success()
         }
         SyncOutcome.TransportFailure -> Result.retry()
+        SyncOutcome.AuthFailure -> Result.failure()
     }
 }

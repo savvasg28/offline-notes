@@ -173,7 +173,7 @@ class SyncEngineTest {
     @Test
     fun `a transport failure leaves the op IN_FLIGHT, and the next successful run recovers it`() = runTest {
         repository.saveNote("note-1", "T1", "B1")
-        transport.forceAuthFailureOnNextCall()
+        transport.forceNetworkFailureOnNextCall()
 
         val outcome = engine.sync()
 

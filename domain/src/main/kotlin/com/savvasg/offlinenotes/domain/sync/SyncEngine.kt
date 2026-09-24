@@ -10,6 +10,8 @@ sealed interface SyncOutcome {
     data object MoreWorkPending : SyncOutcome
 
     data object TransportFailure : SyncOutcome
+
+    data object AuthFailure : SyncOutcome
 }
 
 class SyncEngine @Inject constructor(
@@ -28,6 +30,9 @@ class SyncEngine @Inject constructor(
                 applyOutcomes(transport.push(frozen))
             }
             drainRemoteChanges()
+        } catch (failure: AuthFailureException) {
+            monitor.onTransportFailure(failure)
+            return SyncOutcome.AuthFailure
         } catch (failure: TransportException) {
             monitor.onTransportFailure(failure)
             return SyncOutcome.TransportFailure

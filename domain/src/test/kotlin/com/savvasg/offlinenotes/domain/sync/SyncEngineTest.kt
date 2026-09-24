@@ -70,6 +70,19 @@ class SyncEngineTest {
     }
 
     @Test
+    fun `an auth failure ends the round as AuthFailure, which the worker will not retry`() = runTest {
+        val operations = RecordingSyncOperations(frozen = listOf(op("op-1")))
+        transport.failPushWith = AuthFailureException()
+
+        val outcome = engine(operations).sync()
+
+        assertThat(outcome).isEqualTo(SyncOutcome.AuthFailure)
+        assertThat(monitor.transportFailures.single()).isInstanceOf(AuthFailureException::class.java)
+        assertThat(monitor.outcomes).containsExactly(SyncOutcome.AuthFailure)
+        assertThat(transport.pullCursors).isEmpty()
+    }
+
+    @Test
     fun `every page of a multi-page delta is applied, following the cursor`() = runTest {
         val operations = RecordingSyncOperations(startingToken = "t0")
         transport.pages = mutableListOf(

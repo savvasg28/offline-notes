@@ -2,7 +2,7 @@ package com.savvasg.offlinenotes.data.testing
 
 import com.savvasg.offlinenotes.domain.model.ConflictPayload
 import com.savvasg.offlinenotes.domain.model.FrozenOutboxOp
-import com.savvasg.offlinenotes.domain.sync.AuthFailureException
+import com.savvasg.offlinenotes.domain.sync.NetworkException
 import com.savvasg.offlinenotes.domain.sync.OpOutcome
 import com.savvasg.offlinenotes.domain.sync.RemoteChangePage
 import com.savvasg.offlinenotes.domain.sync.SyncTransport
@@ -55,8 +55,8 @@ class FakeTransport : SyncTransport {
         )
     }
 
-    fun forceAuthFailureOnNextCall() {
-        forcedException = { throw AuthFailureException() }
+    fun forceNetworkFailureOnNextCall() {
+        forcedException = { throw NetworkException("simulated network failure") }
     }
 
     fun queueNextPullPage(page: RemoteChangePage) {

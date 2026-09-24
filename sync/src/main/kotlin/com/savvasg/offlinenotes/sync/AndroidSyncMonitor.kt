@@ -24,6 +24,7 @@ class AndroidSyncMonitor @Inject constructor() : SyncMonitor {
             SyncOutcome.Done -> Log.d(TAG, "sync finished, outbox drained")
             SyncOutcome.MoreWorkPending -> Log.d(TAG, "sync finished with residue; another pass scheduled")
             SyncOutcome.TransportFailure -> Log.w(TAG, "sync did not complete; WorkManager will retry")
+            SyncOutcome.AuthFailure -> Log.e(TAG, "server refused credentials; sync stopped and will not retry")
         }
     }
 

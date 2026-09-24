@@ -296,7 +296,7 @@ same Mockoon instance to watch two devices converge on shared state.
 ## Testing
 
 ```bash
-./gradlew test                      # 89 tests, across every module that has any
+./gradlew test                      # 92 tests, across every module that has any
 ./gradlew connectedDebugAndroidTest # 5 tests (:data:database), needs a device/emulator
 ```
 
@@ -323,6 +323,7 @@ Named scenario tests, each corresponding to a real defect found while designing 
 | `expired_token_triggers_rebootstrap` | `NoteTransactionsTest` | Local-only notes survive; previously-synced-and-now-absent notes are purged. |
 | `a multi-page snapshot keeps every page` | `NoteTransactionsTest`, `SyncEngineTest` | The sweep runs once against the union of pages, not per page. |
 | `an interrupted snapshot never advances the sync token` | `SyncEngineTest` | A failed bootstrap leaves the token untouched rather than at a pagination cursor. |
+| `an auth failure ends the round as AuthFailure` | `SyncEngineTest` | A 401 is terminal for the round: `Result.failure()`, never `retry()`. |
 | `a rejected edit keeps its pull protection` | `NoteTransactionsTest` | A refused op stays in the outbox, so a later pull can't overwrite the text. |
 | `a rejected DELETE restores the note` | `NoteTransactionsTest` | The local tombstone is cleared when the server refuses the delete. |
 | `typing during a staged conflict keeps the note in CONFLICT` | `NoteTransactionsTest` | The badge — and the route to the resolution screen — survives a mid-conflict edit. |
@@ -391,7 +392,9 @@ attaches a credential to any request, so nothing here is deployable against a re
 server as-is. `AuthFailureException` exists and is mapped from a 401 so the sync engine's failure
 handling is honest about the case, but nothing ever produces the token that would avoid one. The
 seam is `:data:network` — an OkHttp `Authenticator` plus an interceptor is where a real token would
-attach, and the sync engine already treats auth failure as a distinct, non-retryable outcome.
+attach. A 401 is already handled as its own outcome, `SyncOutcome.AuthFailure`, which `SyncWorker`
+maps to `Result.failure()` — no retry, no backoff loop — so plugging in real credentials changes
+nothing about how the engine reacts when they're wrong.
 
 ## Explicitly out of scope
 
