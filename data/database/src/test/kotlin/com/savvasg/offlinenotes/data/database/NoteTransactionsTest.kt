@@ -12,6 +12,7 @@ import com.savvasg.offlinenotes.domain.model.ConflictPayload
 import com.savvasg.offlinenotes.domain.model.OpType
 import com.savvasg.offlinenotes.domain.model.RemoteNoteChange
 import com.savvasg.offlinenotes.domain.model.SyncState
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
@@ -291,6 +292,35 @@ class NoteTransactionsTest {
         assertThat(db.outboxDao().getById(opId)).isNull()
         assertThat(db.outboxDao().getPendingForNote("note-1")).isNotNull()
         assertThat(db.noteDao().getNote("note-1")!!.syncState).isEqualTo(SyncState.PENDING)
+    }
+
+    @Test
+    fun `discarding a rejected creation removes the note instead of marking a local-only note SYNCED`() = runTest {
+        transactions.write("note-1", "T1", "B1", now = 1000)
+        val opId = db.outboxDao().getPendingForNote("note-1")!!.opId
+        transactions.freeze()
+        transactions.markRejected(opId, code = "INVALID", message = "No.", now = 2000)
+
+        transactions.discardRejected("note-1")
+
+        assertThat(db.noteDao().getNote("note-1")).isNull()
+        assertThat(db.outboxDao().getById(opId)).isNull()
+    }
+
+    @Test
+    fun `when a note has two rejected ops, the most recent reason is the one surfaced`() = runTest {
+        transactions.write("note-1", "T1", "B1", now = 1000)
+        val first = db.outboxDao().getPendingForNote("note-1")!!.opId
+        transactions.freeze()
+        transactions.write("note-1", "T2", "B2", now = 2000)
+        val second = db.outboxDao().getPendingForNote("note-1")!!.opId
+
+        transactions.markRejected(first, code = "OLD", message = "Old reason.", now = 3000)
+        transactions.freeze()
+        transactions.markRejected(second, code = "NEW", message = "New reason.", now = 4000)
+
+        val surfaced = db.outboxDao().observeRejectedForNote("note-1").first()
+        assertThat(surfaced!!.rejectionMessage).isEqualTo("New reason.")
     }
 
     @Test

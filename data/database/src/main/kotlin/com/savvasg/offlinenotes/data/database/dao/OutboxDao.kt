@@ -42,7 +42,10 @@ interface OutboxDao {
     @Query("SELECT EXISTS(SELECT 1 FROM outbox WHERE noteId = :noteId AND status = 'REJECTED')")
     suspend fun hasRejected(noteId: String): Boolean
 
-    @Query("SELECT * FROM outbox WHERE noteId = :noteId AND status = 'REJECTED' LIMIT 1")
+    @Query("SELECT EXISTS(SELECT 1 FROM outbox WHERE noteId = :noteId)")
+    suspend fun hasAnyForNote(noteId: String): Boolean
+
+    @Query("SELECT * FROM outbox WHERE noteId = :noteId AND status = 'REJECTED' ORDER BY createdAt DESC LIMIT 1")
     fun observeRejectedForNote(noteId: String): Flow<OutboxEntity?>
 
     @Query(

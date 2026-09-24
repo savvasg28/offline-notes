@@ -41,10 +41,7 @@ class NoteTransactions @Inject constructor(
         noteDao.updateSyncState(noteId, state)
     }
 
-    private suspend fun hasLiveOp(noteId: String): Boolean =
-        outboxDao.hasPendingOrInFlight(noteId) ||
-            outboxDao.hasParked(noteId) ||
-            outboxDao.hasRejected(noteId)
+    private suspend fun hasLiveOp(noteId: String): Boolean = outboxDao.hasAnyForNote(noteId)
 
     suspend fun write(noteId: String, title: String, body: String, now: Long) {
         transaction {
@@ -163,6 +160,13 @@ class NoteTransactions @Inject constructor(
     suspend fun discardRejected(noteId: String) {
         transaction {
             outboxDao.deleteRejectedForNote(noteId)
+            val note = noteDao.getNote(noteId) ?: return@transaction
+
+            if (note.serverVersion == null && !hasLiveOp(noteId)) {
+                noteDao.purge(noteId)
+                return@transaction
+            }
+
             recomputeSyncState(noteId)
         }
     }
@@ -203,10 +207,9 @@ class NoteTransactions @Inject constructor(
 
     suspend fun completeSnapshot(presentNoteIds: Set<String>, newSyncToken: String) {
         transaction {
-            for (local in noteDao.getAllSyncedNotes()) {
-                val absentFromSnapshot = local.id !in presentNoteIds
-                if (absentFromSnapshot && !hasLiveOp(local.id)) {
-                    noteDao.purge(local.id)
+            for (id in noteDao.getAllSyncedNoteIds()) {
+                if (id !in presentNoteIds && !hasLiveOp(id)) {
+                    noteDao.purge(id)
                 }
             }
 

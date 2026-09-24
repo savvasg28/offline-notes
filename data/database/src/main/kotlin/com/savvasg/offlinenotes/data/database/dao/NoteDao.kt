@@ -24,8 +24,8 @@ interface NoteDao {
     @Query("SELECT * FROM notes WHERE isDeleted = 0 ORDER BY lastUpdated DESC")
     fun observeActiveNotes(): Flow<List<NoteEntity>>
 
-    @Query("SELECT * FROM notes WHERE serverVersion IS NOT NULL")
-    suspend fun getAllSyncedNotes(): List<NoteEntity>
+    @Query("SELECT id FROM notes WHERE serverVersion IS NOT NULL")
+    suspend fun getAllSyncedNoteIds(): List<String>
 
     @Query("UPDATE notes SET serverVersion = :serverVersion WHERE id = :id")
     suspend fun updateServerVersion(id: String, serverVersion: String)
