@@ -91,14 +91,14 @@ flowchart TD
 ```
 
 Every arrow points at `:domain`, and `:domain` points at nothing. It is a plain
-`kotlin("jvm")` module whose only two external imports, across the whole module, are
-`javax.inject.Inject` and `kotlinx.coroutines.flow.Flow` — no Android, no Room, no Retrofit, no
-serialization. That isn't a convention anyone has to remember: those frameworks are not on its
+`kotlin("jvm")` module whose only external imports, across the whole module, are
+`javax.inject.Inject`, `javax.inject.Qualifier` and `kotlinx.coroutines.flow.Flow` — no Android, no
+Room, no Retrofit, no serialization. That isn't a convention anyone has to remember: those frameworks are not on its
 compile classpath, so reaching for one is a compile error rather than a review comment.
 
 **`:domain` holds the entities, the ports, and the business logic.** `Note`, `NoteConflict` and
 the sync transfer objects in `domain.model`; `NoteRepository` and `NoteSyncOperations` in
-`domain.repository`; `SyncTrigger`, `SyncTransport` and `SyncEngine` in `domain.sync`; and the six
+`domain.repository`; `SyncTrigger`, `SyncTransport` and `SyncEngine` in `domain.sync`; and the eight
 use cases in `domain.usecase`. The ports are declared here and implemented outward — `:data`
 implements the repositories, `:data:network` implements `SyncTransport`, `:sync` implements
 `SyncTrigger` — which is why the dependency arrows run inward rather than out.
@@ -284,7 +284,7 @@ npx @mockoon/cli start --data mockoon/offline-notes.json --port 8080
 ```
 
 The debug build points at `http://10.0.2.2:8080/` (the emulator's alias for the host) via
-`BuildConfig.API_BASE_URL`; change that value in `app/build.gradle.kts` to target a physical
+`BuildConfig.API_BASE_URL`; change that value in `data/network/build.gradle.kts` to target a physical
 device at the host's LAN IP, or a real backend.
 
 Each route ships several responses; enable one at a time in the Mockoon UI:

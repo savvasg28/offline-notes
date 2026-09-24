@@ -21,7 +21,7 @@ npx @mockoon/cli start --data mockoon/offline-notes.json --port 8080
 
 The debug build already points at `http://10.0.2.2:8080/` (the emulator's alias for the host)
 through `BuildConfig.API_BASE_URL`. For a physical device, change that value in
-`app/build.gradle.kts` to your machine's LAN IP.
+`data/network/build.gradle.kts` to your machine's LAN IP.
 
 ## Scripting a scenario
 
