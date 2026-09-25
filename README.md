@@ -3,13 +3,6 @@
 An Android notes app built around one problem, editing offline on several devices and converging
 without losing anyone's work. Most of the code is the sync engine, the UI is there to exercise it.
 
-```bash
-./gradlew installDebug
-```
-
-It works offline from the first launch. Sync runs against a [Mockoon](#running-against-a-mock-server)
-mock of the wire contract, so there is no account and no backend to deploy.
-
 <table>
   <tr>
     <td align="center"><img src="docs/flow-offline-edit.gif" width="150"><br><sub>Edit offline, sync later</sub></td>
@@ -172,6 +165,10 @@ so a crash at any point is recovered by the next run.
 ```bash
 ./gradlew installDebug
 ```
+
+It works offline from the first launch and needs nothing else installed. With no server reachable,
+edits stay `PENDING` and the worker retries with backoff. To see sync, point it at the Mockoon mock
+of the wire contract below.
 
 ### Running against a mock server
 
