@@ -35,8 +35,7 @@ mock of the wire contract; no account, no backend to deploy.
 
 Authentication (a 401 is handled as a terminal outcome, but nothing attaches a credential), rich
 text, real-time collaboration and CRDTs, attachments, encryption, sharing between users, push
-notifications (FCM), iOS/KMP, and the server itself. Each has a seam where it would attach; see
-[design notes](docs/design-notes.md).
+notifications (FCM), iOS/KMP, and the server itself. Each has a seam where it would attach.
 
 ## High-level architecture
 
@@ -54,18 +53,11 @@ notifications (FCM), iOS/KMP, and the server itself. Each has a seam where it wo
   the outbox → push → apply results → pull delta pages → apply with the skip rule.
 - **`:app`** — composition root: Hilt graph, `NavHost`, `Application` with WorkManager config.
 
-```mermaid
-flowchart TD
-    app[":app"] --> fnl[":feature:notelist"] & fed[":feature:editor"] & fco[":feature:conflict"]
-    app --> dat[":data"] & ddb[":data:database"] & dnet[":data:network"] & sync[":sync"] & cds[":core:designsystem"]
-    fnl & fed & fco --> dom[":domain"] & cds
-    dat --> dom & ddb
-    ddb & dnet & sync --> dom
-```
-
 ## API contract
 
-Two endpoints, specified in [`openapi/offline-notes.yaml`](openapi/offline-notes.yaml).
+Two endpoints, specified in [`openapi/offline-notes.yaml`](openapi/offline-notes.yaml). To browse
+it interactively, open the file in [Swagger Editor](https://editor.swagger.io) (File → Import file),
+or run `npx @redocly/cli preview-docs openapi/offline-notes.yaml`.
 
 | Endpoint | Request | Response |
 |---|---|---|
@@ -86,13 +78,25 @@ Rules the schemas can't express:
 
 Room, schema v2 (`data/database/schemas/`), `BundledSQLiteDriver` for FTS5.
 
-| Table | Purpose | Key columns |
-|---|---|---|
-| `notes` | Current local state of every note | `id` PK · `title` · `body` · `serverVersion?` · `syncState` (derived) · `isDeleted` |
-| `outbox` | Every local change not yet acknowledged by the server | `opId` PK · `noteId` FK · `opType` · `status` · `baseVersion` resolved at freeze · `rejectionCode?`/`rejectionMessage?` |
-| `note_conflicts` | The three inputs of a staged conflict | `noteId` PK · `opId` FK (cascade) · `base*` · `remote*` |
-| `sync_meta` | The pull cursor | singleton row · `syncToken?` |
-| `notes_fts` | FTS5 external-content index over `notes` | maintained by triggers |
+| Table | Holds |
+|---|---|
+| `notes` | The current local state of every note |
+| `outbox` | Every local change the server has not yet acknowledged |
+| `note_conflicts` | The three inputs of a staged conflict: base, local, remote |
+| `sync_meta` | The pull cursor (one row) |
+| `notes_fts` | FTS5 index over `notes`, kept in sync by triggers |
+
+```text
+notes           id PK, title, body, serverVersion?, syncState, isDeleted, createdAt, lastUpdated
+outbox          opId PK, noteId -> notes, opType, title?, body?, status, createdAt,
+                attemptCount, rejectionCode?, rejectionMessage?
+note_conflicts  noteId PK, opId -> outbox (cascade), baseVersion?, baseTitle?, baseBody?,
+                remoteVersion, remoteTitle, remoteBody, detectedAt
+sync_meta       id = 0, syncToken?
+```
+
+`?` marks a nullable column. `syncState` is derived (see below). `baseVersion` is not stored on the
+op: it is read from `notes.serverVersion` at freeze time.
 
 Two constraints are schema-level rather than convention:
 
@@ -182,7 +186,7 @@ Mockoon is stateless, so it drives every client path but cannot show two devices
 
 `SyncEngine` is tested in pure JVM against fake ports; `NoteTransactions` against a real Room
 instance under Robolectric. Each named scenario test corresponds to a defect found while building
-this — see [design notes](docs/design-notes.md#testing) for the list.
+this — the names in `NoteTransactionsTest` and the two `SyncEngineTest`s read as the list.
 
 ## Tech stack
 
