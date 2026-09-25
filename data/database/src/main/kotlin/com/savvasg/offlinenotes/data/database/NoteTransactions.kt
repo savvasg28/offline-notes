@@ -113,7 +113,7 @@ class NoteTransactions @Inject constructor(
     }
 
     suspend fun freeze(): List<FrozenOutboxOp> = transaction {
-        outboxDao.getPendingOpsOrderedByCreatedAt().map { op ->
+        outboxDao.getPendingOpsOrderedByCreatedAt().distinctBy { it.noteId }.map { op ->
             val note = requireNotNull(noteDao.getNote(op.noteId)) {
                 "outbox op ${op.opId} references missing note ${op.noteId}"
             }

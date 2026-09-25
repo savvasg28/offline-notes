@@ -37,8 +37,6 @@ dependencies {
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.truth)
 
-    androidTestImplementation(libs.androidx.room.testing)
-    androidTestImplementation(libs.androidx.sqlite.bundled)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.kotlinx.coroutines.test)

@@ -26,7 +26,6 @@ object DatabaseModule {
         Room.databaseBuilder(context, OfflineNotesDatabase::class.java, OfflineNotesDatabase.DB_NAME)
             .setDriver(BundledSQLiteDriver())
             .setQueryCoroutineContext(Dispatchers.IO)
-            .addMigrations(OfflineNotesDatabase.MIGRATION_1_2)
             .addCallback(OfflineNotesDatabase.SCHEMA_CALLBACK)
             .addCallback(OfflineNotesDatabase.FTS_CALLBACK)
             .build()

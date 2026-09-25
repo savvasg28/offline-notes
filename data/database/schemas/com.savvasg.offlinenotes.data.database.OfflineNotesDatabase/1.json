@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "5ca03766a39dd75e6b7275f823ccbfea",
+    "identityHash": "22b828e8ccdcaabca80ba24c7378ef54",
     "entities": [
       {
         "tableName": "notes",
@@ -80,7 +80,7 @@
       },
       {
         "tableName": "outbox",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`opId` TEXT NOT NULL, `noteId` TEXT NOT NULL, `opType` TEXT NOT NULL, `title` TEXT, `body` TEXT, `status` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `attemptCount` INTEGER NOT NULL, PRIMARY KEY(`opId`), FOREIGN KEY(`noteId`) REFERENCES `notes`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`opId` TEXT NOT NULL, `noteId` TEXT NOT NULL, `opType` TEXT NOT NULL, `title` TEXT, `body` TEXT, `status` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `attemptCount` INTEGER NOT NULL, `rejectionCode` TEXT, `rejectionMessage` TEXT, PRIMARY KEY(`opId`), FOREIGN KEY(`noteId`) REFERENCES `notes`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
         "fields": [
           {
             "fieldPath": "opId",
@@ -127,6 +127,16 @@
             "columnName": "attemptCount",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "rejectionCode",
+            "columnName": "rejectionCode",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "rejectionMessage",
+            "columnName": "rejectionMessage",
+            "affinity": "TEXT"
           }
         ],
         "primaryKey": {
@@ -283,7 +293,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '5ca03766a39dd75e6b7275f823ccbfea')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '22b828e8ccdcaabca80ba24c7378ef54')"
     ]
   }
 }

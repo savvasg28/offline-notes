@@ -12,7 +12,7 @@ interface OutboxDao {
     @Upsert
     suspend fun upsert(op: OutboxEntity)
 
-    @Query("SELECT * FROM outbox WHERE noteId = :noteId AND status = 'PENDING' LIMIT 1")
+    @Query("SELECT * FROM outbox WHERE noteId = :noteId AND status = 'PENDING' ORDER BY createdAt DESC LIMIT 1")
     suspend fun getPendingForNote(noteId: String): OutboxEntity?
 
     @Query("SELECT * FROM outbox WHERE opId = :opId")

@@ -74,7 +74,7 @@ Rules the schemas can't express:
 
 ## Data model
 
-Room, schema v2 (`data/database/schemas/`), `BundledSQLiteDriver` for FTS5.
+Room, schema v1 (`data/database/schemas/`), `BundledSQLiteDriver` for FTS5.
 
 | Table | Holds |
 |---|---|
@@ -98,9 +98,13 @@ op: it is read from `notes.serverVersion` at freeze time.
 
 Two constraints are schema-level rather than convention:
 
-- **One mutable op per note.** A partial unique index on `outbox(noteId) WHERE status = 'PENDING'`
-  means rapid edits coalesce into the same row, while an edit during an in-flight op creates a
-  new one. The frozen op is never mutated — that's what makes `opId` an honest idempotency key.
+- **One mutable op per note.** A `BEFORE INSERT` trigger on `outbox` rejects a second `PENDING`
+  row for the same note, so rapid edits coalesce into one row while an edit during an in-flight
+  op creates a new one. The frozen op is never mutated — that's what makes `opId` an honest
+  idempotency key. A trigger rather than a partial unique index: Room can't model partial indices,
+  and a unique index would also reject the crash-recovery case where a replayed op and a newer
+  edit are both `PENDING`. A round freezes only the oldest op per note, so the replay is
+  acknowledged first and the newer edit ships with the right `baseVersion`.
 - **Derived `syncState`.** Every transaction that touches `outbox` or `note_conflicts` ends by
   recomputing the note's state from those tables: `CONFLICT` > `REJECTED` > `PENDING` > `SYNCED`.
   The badge can't disagree with the rows it summarises.
@@ -177,9 +181,9 @@ Mockoon is stateless, so it drives every client path but cannot show two devices
 ### Tests and checks
 
 ```bash
-./gradlew test                       # 92 unit tests, every module
+./gradlew test                       # 93 unit tests, every module
 ./gradlew lint detektAll             # Android Lint (warnings are errors) + detekt with type resolution
-./gradlew connectedDebugAndroidTest  # 5 instrumented tests: FTS5 and the schema migration
+./gradlew connectedDebugAndroidTest  # 4 instrumented tests: FTS5 search
 ```
 
 `SyncEngine` is tested in pure JVM against fake ports; `NoteTransactions` against a real Room

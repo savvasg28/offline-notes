@@ -74,7 +74,7 @@ class NoteTransactionsTest {
     }
 
     @Test
-    fun `partial unique index rejects a second PENDING op for the same note at the schema level`() = runTest {
+    fun `the schema rejects a second PENDING op inserted for the same note`() = runTest {
         transactions.write("note-1", "T1", "B1", now = 1000)
 
         try {
@@ -564,6 +564,19 @@ class NoteTransactionsTest {
         val note = db.noteDao().getNote("note-1")!!
         assertThat(note.syncState).isEqualTo(SyncState.PENDING)
         assertThat(note.title).isEqualTo("Merged Title")
+    }
+
+    @Test
+    fun `a crash with an in-flight op and a newer pending op for the same note is recoverable`() = runTest {
+        transactions.write("note-1", "T1", "B1", now = 1000)
+        transactions.freeze()
+        transactions.write("note-1", "T2", "B2", now = 2000)
+
+        db.outboxDao().resetInFlightToPending()
+
+        val frozen = transactions.freeze()
+        assertThat(frozen.map { it.title }).containsExactly("T1")
+        assertThat(db.outboxDao().hasAnyPending()).isTrue()
     }
 
     @Test
