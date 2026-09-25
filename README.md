@@ -1,14 +1,14 @@
 # Offline-First Notes
 
-An Android notes app built around one problem: editing offline on several devices and converging
-without losing anyone's work. The sync engine is the product; the UI exists to exercise it.
+An Android notes app built around one problem, editing offline on several devices and converging
+without losing anyone's work. Most of the code is the sync engine, the UI is there to exercise it.
 
 ```bash
 ./gradlew installDebug
 ```
 
-Works fully offline the moment it installs. Sync targets a [Mockoon](#running-against-a-mock-server)
-mock of the wire contract; no account, no backend to deploy.
+It works offline from the first launch. Sync runs against a [Mockoon](#running-against-a-mock-server)
+mock of the wire contract, so there is no account and no backend to deploy.
 
 <table>
   <tr>
@@ -22,11 +22,11 @@ mock of the wire contract; no account, no backend to deploy.
 ## Functional requirements
 
 - Create, edit, search and delete notes with the device offline.
-- Every edit is saved locally as it is typed; nothing waits on the network.
+- Every edit is saved locally as it is typed. Nothing waits on the network.
 - Changes sync to a server in the background and reach the user's other devices.
-- Concurrent edits to the same note on two devices are detected and surfaced to the user, who
-  picks a side or merges by hand. Nothing is auto-merged.
-- A change the server refuses is shown as such, with the reason, and can be edited again or
+- Concurrent edits to the same note on two devices are detected and shown to the user, who picks
+  a side or merges by hand. Nothing is auto-merged.
+- A change the server refuses is shown as such, with the reason. It can be edited again or
   discarded.
 
 ## Non-functional requirements
@@ -34,33 +34,34 @@ mock of the wire contract; no account, no backend to deploy.
 | Requirement | What the client guarantees | What it does not |
 |---|---|---|
 | Durability | A committed edit survives process death. Dismissing the editor mid-write cannot roll back the last keystroke. | A write still in flight at process death. |
-| No silent loss | Remote state never overwrites a note that has an unresolved local change — pending, in flight, conflicted or rejected. | Notes with no local change, which a pull is free to update. |
-| Idempotent retries | Every operation carries a stable `opId`; a replay is byte-identical to the original. | Server-side dedupe. That is the server's half of the contract. |
-| Atomicity | Every multi-table write is one Room transaction. | — |
+| No silent loss | Remote state never overwrites a note that has an unresolved local change, whether pending, in flight, conflicted or rejected. | Notes with no local change, which a pull is free to update. |
+| Idempotent retries | Every operation carries a stable `opId`. A replay is byte-identical to the original. | Server-side dedupe. That is the server's half of the contract. |
+| Atomicity | Every multi-table write is one Room transaction. | Nothing. |
 | Convergence | With eventual connectivity, a conforming server, and conflicts resolved, replicas converge. | Convergence while a conflict is unresolved. |
-| Freshness | Sync is *requested* ~30s after the first edit, immediately on editor close or app foreground, and every 6h as a backstop. | Any upper bound on when it runs. WorkManager's delay is the earliest eligible time; Doze and the network constraint push it later. |
+| Freshness | Sync is *requested* about 30s after the first edit, immediately on editor close or app foreground, and every 6h as a backstop. | Any upper bound on when it runs. WorkManager's delay is the earliest eligible time, Doze and the network constraint can push it later. |
 
 ## Out of scope
 
 Authentication (a 401 is handled as a terminal outcome, but nothing attaches a credential), rich
 text, real-time collaboration and CRDTs, attachments, encryption, sharing between users, push
-notifications (FCM), iOS/KMP, and the server itself. Each has a seam where it would attach.
+notifications (FCM), iOS/KMP, and the server itself. Each of these has an obvious seam to attach to.
 
 ## High-level architecture
 
 ![High-level architecture](docs/architecture.png)
 
-- **Presentation** — Compose screens and ViewModels. ViewModels call use cases and observe
-  `Flow`s from them; they never touch a repository (enforced by a Konsist test).
-- **Domain** — a pure Kotlin module: entities, the interfaces the rest of the app implements
+- **Presentation.** Compose screens and ViewModels. ViewModels call use cases and observe `Flow`s
+  from them. They never touch a repository, a Konsist test enforces that.
+- **Domain.** A pure Kotlin module. Entities, the interfaces the rest of the app implements
   (`NoteRepository`, `NoteSyncOperations`, `SyncTransport`, `SyncTrigger`), use cases, and
   `SyncEngine`. No Android, Room or Retrofit on its classpath.
-- **Data** — one repository class behind two interfaces: the UI-facing one and the sync-facing
-  one. The sync engine holds only the sync-facing interface, so it cannot write note content.
-  Room is the single source of truth; the UI observes it and never the server.
-- **Background** — a WorkManager worker runs one sync round: reset stale in-flight ops → freeze
-  the outbox → push → apply results → pull delta pages → apply with the skip rule.
-- **`:app`** — composition root: Hilt graph, `NavHost`, `Application` with WorkManager config.
+- **Data.** One repository class behind two interfaces, the UI-facing one and the sync-facing one.
+  The sync engine only holds the sync-facing interface, so it cannot write note content. Room is
+  the single source of truth, the UI observes it and never the server.
+- **Background.** A WorkManager worker runs one sync round. Reset stale in-flight ops, freeze the
+  outbox, push, apply results, pull delta pages, apply them with the skip rule.
+- **`:app`.** The composition root. Hilt graph, `NavHost`, and the `Application` with the
+  WorkManager config.
 
 ## API contract
 
@@ -68,18 +69,18 @@ Two endpoints, specified in [`openapi/offline-notes.yaml`](openapi/offline-notes
 
 | Endpoint | Request | Response |
 |---|---|---|
-| `POST /push` | Array of frozen ops: `opId`, `type` (CREATE/UPDATE/DELETE), `noteId`, `baseVersion`, `title`, `body` | One result per op, in order: `Applied{newVersion}` · `Conflict{base*, remote*}` · `Rejected{code, message}` |
-| `GET /pull?since=` | Opaque cursor; omitted for a full snapshot | `{notes[], nextSyncToken, hasMore}` — paged; each note is content or a tombstone |
+| `POST /push` | Array of frozen ops: `opId`, `type` (CREATE/UPDATE/DELETE), `noteId`, `baseVersion`, `title`, `body` | One result per op, in order: `Applied{newVersion}`, `Conflict{base*, remote*}`, `Rejected{code, message}` |
+| `GET /pull?since=` | Opaque cursor, omitted for a full snapshot | `{notes[], nextSyncToken, hasMore}`, paged. Each note is either content or a tombstone |
 
-Rules the schemas can't express:
+Rules the schema cannot express.
 
 - **Compare-and-swap.** An op whose `baseVersion` isn't the note's current server version comes
-  back as `Conflict`, carrying the remote side (and the base side when history still has it).
+  back as `Conflict`, carrying the remote side, and the base side when history still has it.
 - **Per-op independence.** One conflicting or rejected op never fails the batch.
 - **Results vs. failures.** `Conflict` and `Rejected` are 200s. 429 and 5xx are retried with the
-  same `opId`s. 401 ends the round; there's nothing to retry with. 410 on `/pull` means the cursor
-  expired: re-bootstrap.
-- **Client-generated `noteId`** — a note has an identity before it has ever synced.
+  same `opId`s. 401 ends the round, there is nothing to retry with. 410 on `/pull` means the cursor
+  expired, so the client re-bootstraps.
+- **Client-generated `noteId`.** A note has an id before it has ever synced.
 
 ## Data model
 
@@ -103,66 +104,68 @@ sync_meta       id = 0, syncToken?
 ```
 
 `?` marks a nullable column. `syncState` is derived (see below). `baseVersion` is not stored on the
-op: it is read from `notes.serverVersion` at freeze time.
+op, it is read from `notes.serverVersion` at freeze time.
 
-Two constraints are schema-level rather than convention:
+Two constraints live in the schema rather than in convention.
 
 - **One mutable op per note.** A `BEFORE INSERT` trigger on `outbox` rejects a second `PENDING`
-  row for the same note, so rapid edits coalesce into one row while an edit during an in-flight
-  op creates a new one. The frozen op is never mutated — that's what makes `opId` an honest
-  idempotency key. A trigger rather than a partial unique index: Room can't model partial indices,
-  and a unique index would also reject the crash-recovery case where a replayed op and a newer
-  edit are both `PENDING`. A round freezes only the oldest op per note, so the replay is
-  acknowledged first and the newer edit ships with the right `baseVersion`.
+  row for the same note. Rapid edits coalesce into one row, an edit during an in-flight op creates
+  a new one. The frozen op is never mutated, so `opId` works as an idempotency key. It is a trigger
+  rather than a partial unique index because Room can't model partial indices, and a unique index
+  would also reject the crash-recovery case where a replayed op and a newer edit are both
+  `PENDING`. A round freezes only the oldest op per note, so the replay is acknowledged first and
+  the newer edit ships with the right `baseVersion`.
 - **Derived `syncState`.** Every transaction that touches `outbox` or `note_conflicts` ends by
-  recomputing the note's state from those tables: `CONFLICT` > `REJECTED` > `PENDING` > `SYNCED`.
-  The badge can't disagree with the rows it summarises.
+  recomputing the note's state from those tables, `CONFLICT` > `REJECTED` > `PENDING` > `SYNCED`.
+  So the badge in the list is always computed from the same rows it summarises.
 
 ## State diagrams
 
-**Outbox op lifecycle** — the state of one row in `outbox`, from a user edit to the server's
-acknowledgement. A row is never mutated after freeze; resolving a conflict or editing again
-creates a new row with a new `opId` in the same transaction that deletes the old one.
+**Outbox op lifecycle.** The state of one row in `outbox`, from a user edit to the server's
+acknowledgement. A row is never mutated after freeze. Resolving a conflict or editing again
+creates a new row with a new `opId`, in the same transaction that deletes the old one.
 
 ![Outbox op lifecycle](docs/op-lifecycle.png)
 
-**Sync round** — what one WorkManager run does. Every step is either a transaction or idempotent,
+**Sync round.** What one WorkManager run does. Every step is either a transaction or idempotent,
 so a crash at any point is recovered by the next run.
 
 ![Sync round](docs/sync-round.png)
 
 ## Implementation notes
 
-- **Skip rule.** A pulled change is applied only if the note has no live outbox row. That single
-  check is what protects local edits; every serious defect found while building this lived next
-  to it, not in the type system.
+- **Skip rule.** A pulled change is applied only if the note has no live outbox row. That one
+  check is what protects local edits. Most of the defects found while building this were next to
+  it.
 - **Conflicts are detected on push only.** A pull carries no `baseVersion`, so it can avoid
   creating a conflict but never detect one. Resolution is an ordinary `UPDATE` with a new `opId`
-  and `baseVersion = remoteVersion` — there is no `/resolve` endpoint.
-- **Rejection is terminal for the op, not the edit.** The row stays, marked `REJECTED` with the
-  server's reason, which keeps the skip rule armed. Editing again supersedes it; discarding lets
+  and `baseVersion = remoteVersion`, so there is no `/resolve` endpoint.
+- **Rejection.** The op ends, the edit stays. The row is kept and marked `REJECTED` with the
+  server's reason, which keeps the skip rule armed. Editing again supersedes it, discarding lets
   the next pull reconcile.
-- **Bootstrap is a three-call protocol.** Pages are applied as they arrive; the sweep that deletes
+- **Bootstrap is a three-call protocol.** Pages are applied as they arrive. The sweep that deletes
   locally-synced notes the server no longer has runs once, against the union of every page, and
-  only then is the cursor advanced. A crash mid-bootstrap leaves extra notes, never missing ones.
-- **The last keystroke is `NonCancellable`.** Dismissing the editor cancels `viewModelScope`;
-  wrapping the write in `withContext(NonCancellable)` lets the in-flight transaction commit.
-- **Sync triggers.** Delay-from-*first*-edit, not debounce-from-last — a debounce never fires
-  during continuous typing. Editor close and foreground request an immediate round.
+  only then is the cursor advanced. So a crash mid-bootstrap can leave extra notes but not missing
+  ones.
+- **The last keystroke is `NonCancellable`.** Dismissing the editor cancels `viewModelScope`, so
+  the write is wrapped in `withContext(NonCancellable)` and the in-flight transaction commits.
+- **Sync triggers.** The delay counts from the first edit rather than the last, a debounce never
+  fires during continuous typing. Closing the editor or foregrounding the app requests an
+  immediate round.
 
 ## Alternatives considered
 
-- **Server-side auto-merge (`Merged` result).** Cut: applying merged text into a note the user is
-  still typing in either reverts under their cursor or drops the other device's change on the next
-  push. Non-overlapping concurrent edits now surface as conflicts instead.
-- **Dirty flag instead of an outbox.** Can't say *what* changed, can't survive a partial apply,
-  gives no idempotency key. The outbox makes "no pending op" a provable precondition for a pull.
-- **Owning a reference server.** An earlier version shipped a Ktor backend. Cut: a client has to
-  be correct against the contract it's given, not one it invented. Mockoon plays the contract.
+- **Server-side auto-merge (`Merged` result).** Cut because applying merged text into a note the
+  user is still typing in either reverts under their cursor or drops the other device's change on
+  the next push. So non-overlapping concurrent edits surface as conflicts instead.
+- **Dirty flag instead of an outbox.** A flag can't say *what* changed and gives no idempotency
+  key, so a partial apply can't be recovered either. The outbox makes "no pending op" a provable
+  precondition for a pull.
+- **Owning a reference server.** An earlier version shipped a Ktor backend. Cut, I wanted the
+  client tested against a contract it doesn't control. Mockoon plays that contract.
 - **Application-scoped write** to protect the last keystroke. Google's documented pattern, and it
-  worked; replaced by one `NonCancellable` line because that was the only write that needed it.
-- **FCM, KMP/iOS.** Additive later; each would be a weaker claim than an honest single-platform
-  client today.
+  worked. Replaced by one `NonCancellable` line, since that was the only write that needed it.
+- **FCM, KMP/iOS.** Both can be added later without touching the sync engine.
 
 ## Running the app
 
@@ -177,16 +180,15 @@ npx @mockoon/cli start --data mockoon/offline-notes.json --port 8080
 ```
 
 The debug build points at `http://10.0.2.2:8080/` (the emulator's alias for the host) via
-`BuildConfig.API_BASE_URL` in `data/network/build.gradle.kts`. Each route ships several responses;
-enable one at a time in the Mockoon UI to drive a scenario:
+`BuildConfig.API_BASE_URL` in `data/network/build.gradle.kts`. Each route ships several responses,
+enable one at a time in the Mockoon UI to drive a scenario.
 
-- **Conflict** on `POST /push`, then edit a note you created — the conflict banner appears on the next sync. Resolving is accepted (a rule matches the resolution's `baseVersion`).
-- **Rejected** on `POST /push` — the note shows *Not saved* with the reason and a Discard action.
-- **Remote change** on `GET /pull`, then foreground the app — a note edited elsewhere arrives.
-- **410** on `GET /pull` — the client discards its cursor and re-bootstraps.
+- **Conflict** on `POST /push`, then edit a note you created. The conflict banner appears on the next sync. Resolving is accepted, a rule matches the resolution's `baseVersion`.
+- **Rejected** on `POST /push`. The note shows *Not saved* with the reason and a Discard action.
+- **Remote change** on `GET /pull`, then foreground the app. A note edited elsewhere arrives.
+- **410** on `GET /pull`. The client discards its cursor and re-bootstraps.
 
-Enable one scenario at a time. Mockoon is stateless, so it drives every client path but cannot show
-two devices converging.
+Mockoon is stateless, so it drives every client path but cannot show two devices converging.
 
 ### Tests and checks
 
@@ -196,9 +198,10 @@ two devices converging.
 ./gradlew connectedDebugAndroidTest  # 4 instrumented tests: FTS5 search
 ```
 
-`SyncEngine` is tested in pure JVM against fake ports; `NoteTransactions` against a real Room
-instance under Robolectric. Each named scenario test corresponds to a defect found while building
-this — the names in `NoteTransactionsTest` and the two `SyncEngineTest`s read as the list.
+`SyncEngine` is tested on the JVM against fake ports, `NoteTransactions` against a real Room
+instance under Robolectric. Most of the named scenario tests came from a defect found while
+building this, so the test names in `NoteTransactionsTest` and the two `SyncEngineTest`s double
+as the defect list.
 
 ## Tech stack
 
