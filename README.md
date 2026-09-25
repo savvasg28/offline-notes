@@ -55,9 +55,7 @@ notifications (FCM), iOS/KMP, and the server itself. Each has a seam where it wo
 
 ## API contract
 
-Two endpoints, specified in [`openapi/offline-notes.yaml`](openapi/offline-notes.yaml). To browse
-it interactively, open the file in [Swagger Editor](https://editor.swagger.io) (File → Import file),
-or run `npx @redocly/cli preview-docs openapi/offline-notes.yaml`.
+Two endpoints, specified in [`openapi/offline-notes.yaml`](openapi/offline-notes.yaml).
 
 | Endpoint | Request | Response |
 |---|---|---|
