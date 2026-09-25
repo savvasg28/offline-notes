@@ -23,7 +23,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.savvasg.offlinenotes.core.designsystem.component.EditorField
+import com.savvasg.offlinenotes.core.designsystem.component.EmptyState
 import com.savvasg.offlinenotes.core.designsystem.component.InlineBanner
+import com.savvasg.offlinenotes.core.designsystem.component.LoadingIndicator
 import com.savvasg.offlinenotes.core.designsystem.component.NotesTopAppBar
 import com.savvasg.offlinenotes.core.designsystem.theme.Spacing
 import com.savvasg.offlinenotes.domain.model.SyncState
@@ -90,45 +92,74 @@ fun NoteEditorContent(
             )
         },
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            if (uiState.syncState == SyncState.CONFLICT) {
-                InlineBanner(
-                    text = stringResource(R.string.editor_conflict_banner),
-                    actionLabel = stringResource(DesignSystemR.string.action_resolve),
-                    onAction = onResolveConflict,
-                )
-            }
-            if (uiState.syncState == SyncState.REJECTED) {
-                InlineBanner(
-                    text = uiState.rejectionMessage?.takeIf { it.isNotBlank() }
-                        ?: stringResource(R.string.editor_rejected_banner),
-                    actionLabel = stringResource(R.string.editor_rejected_discard),
-                    onAction = onDiscardRejected,
-                )
-            }
-            if (uiState.isLoading) return@Column
-            EditorField(
-                value = uiState.title,
-                onValueChange = onTitleChange,
-                placeholder = stringResource(DesignSystemR.string.note_title_hint),
-                modifier = Modifier.fillMaxWidth(),
-                textStyle = MaterialTheme.typography.headlineSmall,
-                singleLine = true,
+        when (uiState) {
+            NoteEditorUiState.Loading -> LoadingIndicator(
+                modifier = Modifier.padding(padding).padding(horizontal = Spacing.lg),
             )
-            EditorField(
-                value = uiState.body,
-                onValueChange = onBodyChange,
-                placeholder = stringResource(DesignSystemR.string.note_body_hint),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(bottom = Spacing.lg),
+
+            is NoteEditorUiState.Error -> EmptyState(
+                title = stringResource(R.string.editor_error),
+                supporting = uiState.message,
+                modifier = Modifier.padding(padding),
+            )
+
+            is NoteEditorUiState.Success -> NoteEditor(
+                state = uiState,
+                onTitleChange = onTitleChange,
+                onBodyChange = onBodyChange,
+                onResolveConflict = onResolveConflict,
+                onDiscardRejected = onDiscardRejected,
+                modifier = Modifier.padding(padding),
             )
         }
+    }
+}
+
+@Composable
+private fun NoteEditor(
+    state: NoteEditorUiState.Success,
+    onTitleChange: (String) -> Unit,
+    onBodyChange: (String) -> Unit,
+    onResolveConflict: () -> Unit,
+    onDiscardRejected: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        if (state.syncState == SyncState.CONFLICT) {
+            InlineBanner(
+                text = stringResource(R.string.editor_conflict_banner),
+                actionLabel = stringResource(DesignSystemR.string.action_resolve),
+                onAction = onResolveConflict,
+            )
+        }
+        if (state.syncState == SyncState.REJECTED) {
+            InlineBanner(
+                text = state.rejectionMessage?.takeIf { it.isNotBlank() }
+                    ?: stringResource(R.string.editor_rejected_banner),
+                actionLabel = stringResource(R.string.editor_rejected_discard),
+                onAction = onDiscardRejected,
+            )
+        }
+        EditorField(
+            value = state.title,
+            onValueChange = onTitleChange,
+            placeholder = stringResource(DesignSystemR.string.note_title_hint),
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = MaterialTheme.typography.headlineSmall,
+            singleLine = true,
+        )
+        EditorField(
+            value = state.body,
+            onValueChange = onBodyChange,
+            placeholder = stringResource(DesignSystemR.string.note_body_hint),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = Spacing.lg),
+        )
     }
 }

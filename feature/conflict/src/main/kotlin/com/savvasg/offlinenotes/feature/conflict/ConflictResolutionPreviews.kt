@@ -22,17 +22,19 @@ class ConflictResolutionUiStateProvider : PreviewParameterProvider<ConflictResol
     )
 
     override val values = sequenceOf(
-        ConflictResolutionUiState(
+        ConflictResolutionUiState.Success(
             conflict = withBase,
             draftTitle = withBase.localTitle,
             draftBody = withBase.localBody,
         ),
-        ConflictResolutionUiState(
+        ConflictResolutionUiState.Success(
             conflict = withBase.copy(baseVersion = null, baseTitle = null, baseBody = null),
             draftTitle = withBase.localTitle,
             draftBody = withBase.localBody,
         ),
-        ConflictResolutionUiState(conflict = null, draftTitle = "", draftBody = ""),
+        ConflictResolutionUiState.NoConflict,
+        ConflictResolutionUiState.Loading,
+        ConflictResolutionUiState.Error("Conflict store is unavailable"),
     )
 }
 

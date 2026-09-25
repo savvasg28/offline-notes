@@ -19,6 +19,7 @@ import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -57,6 +58,8 @@ class NoteEditorViewModelTest {
         Dispatchers.resetMain()
     }
 
+    private fun NoteEditorViewModel.loaded() = uiState.value as NoteEditorUiState.Success
+
     private fun note(
         title: String,
         body: String,
@@ -90,16 +93,16 @@ class NoteEditorViewModelTest {
 
         note.tryEmit(note("Device B title", "Device B body", SyncState.CONFLICT))
 
-        assertThat(viewModel.uiState.value.title).isEqualTo("My edit")
-        assertThat(viewModel.uiState.value.syncState).isEqualTo(SyncState.CONFLICT)
+        assertThat(viewModel.loaded().title).isEqualTo("My edit")
+        assertThat(viewModel.loaded().syncState).isEqualTo(SyncState.CONFLICT)
     }
 
     @Test
     fun `an existing note seeds the editor before the user touches it`() = runTest {
         note.tryEmit(note("Server title", "Server body", SyncState.SYNCED))
 
-        assertThat(viewModel.uiState.value.title).isEqualTo("Server title")
-        assertThat(viewModel.uiState.value.body).isEqualTo("Server body")
+        assertThat(viewModel.loaded().title).isEqualTo("Server title")
+        assertThat(viewModel.loaded().body).isEqualTo("Server body")
     }
 
     @Test
@@ -114,12 +117,13 @@ class NoteEditorViewModelTest {
             SavedStateHandle(route = EditorRoute("note-2")),
         )
 
+        assertThat(subject.uiState.value).isEqualTo(NoteEditorUiState.Loading)
         subject.onTitleChange("X")
         unloaded.tryEmit(
             Note("note-2", "Server title", "Server body", SyncState.SYNCED, false, 0, 0),
         )
 
-        assertThat(subject.uiState.value.title).isEqualTo("Server title")
+        assertThat(subject.loaded().title).isEqualTo("Server title")
         coVerify(exactly = 0) { repository.saveNote(any(), any(), any()) }
     }
 
@@ -129,8 +133,8 @@ class NoteEditorViewModelTest {
             note("T", "B", SyncState.REJECTED, RejectionReason("TOO_LARGE", "Body exceeds 64 KB.")),
         )
 
-        assertThat(viewModel.uiState.value.syncState).isEqualTo(SyncState.REJECTED)
-        assertThat(viewModel.uiState.value.rejectionMessage).isEqualTo("Body exceeds 64 KB.")
+        assertThat(viewModel.loaded().syncState).isEqualTo(SyncState.REJECTED)
+        assertThat(viewModel.loaded().rejectionMessage).isEqualTo("Body exceeds 64 KB.")
     }
 
     @Test
@@ -140,6 +144,20 @@ class NoteEditorViewModelTest {
         viewModel.onDiscardRejected()
 
         coVerify(exactly = 1) { repository.discardRejectedChange("note-1") }
+    }
+
+    @Test
+    fun `a failing note stream surfaces as an error state instead of crashing the screen`() = runTest {
+        every { repository.observeNote("note-3") } returns flow { error("database is closed") }
+        val subject = NoteEditorViewModel(
+            ObserveNoteUseCase(repository),
+            SaveNoteUseCase(repository),
+            RequestSyncUseCase(syncTrigger),
+            DiscardRejectedChangeUseCase(repository),
+            SavedStateHandle(route = EditorRoute("note-3")),
+        )
+
+        assertThat(subject.uiState.value).isEqualTo(NoteEditorUiState.Error("database is closed"))
     }
 
     @Test

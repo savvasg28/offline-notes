@@ -57,7 +57,7 @@ class ConflictResolutionContentTest {
 
     @Test
     fun `all three versions are shown so the user can compare before choosing`() {
-        render(ConflictResolutionUiState(conflict, conflict.localTitle, conflict.localBody))
+        render(ConflictResolutionUiState.Success(conflict, conflict.localTitle, conflict.localBody))
 
         compose.scrollTo("Mine").assertIsDisplayed()
         compose.scrollTo("Base").assertIsDisplayed()
@@ -67,7 +67,7 @@ class ConflictResolutionContentTest {
     @Test
     fun `without a common ancestor the base card is replaced by an explanation`() {
         val noBase = conflict.copy(baseVersion = null, baseTitle = null, baseBody = null)
-        render(ConflictResolutionUiState(noBase, noBase.localTitle, noBase.localBody))
+        render(ConflictResolutionUiState.Success(noBase, noBase.localTitle, noBase.localBody))
 
         compose.scrollTo("No common history available — showing local vs. remote only.")
             .assertIsDisplayed()
@@ -75,9 +75,17 @@ class ConflictResolutionContentTest {
 
     @Test
     fun `a resolved conflict shows the empty state rather than a blank screen`() {
-        render(ConflictResolutionUiState(conflict = null, draftTitle = "", draftBody = ""))
+        render(ConflictResolutionUiState.NoConflict)
 
         compose.onNodeWithText("No conflict to resolve.").assertIsDisplayed()
+    }
+
+    @Test
+    fun `a failed load shows the reason rather than a blank screen`() {
+        render(ConflictResolutionUiState.Error("database is closed"))
+
+        compose.onNodeWithText("Couldn't load this conflict").assertIsDisplayed()
+        compose.onNodeWithText("database is closed").assertIsDisplayed()
     }
 
     @Test
@@ -85,7 +93,7 @@ class ConflictResolutionContentTest {
         var mine = 0
         var theirs = 0
         render(
-            ConflictResolutionUiState(conflict, conflict.localTitle, conflict.localBody),
+            ConflictResolutionUiState.Success(conflict, conflict.localTitle, conflict.localBody),
             onUseMine = { mine++ },
             onUseTheirs = { theirs++ },
         )
@@ -101,7 +109,7 @@ class ConflictResolutionContentTest {
     fun `resolve submits the draft`() {
         var resolved = 0
         render(
-            ConflictResolutionUiState(conflict, "Merged", "Merged body"),
+            ConflictResolutionUiState.Success(conflict, "Merged", "Merged body"),
             onResolve = { resolved++ },
         )
 

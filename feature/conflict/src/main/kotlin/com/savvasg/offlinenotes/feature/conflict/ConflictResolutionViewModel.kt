@@ -11,16 +11,25 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-data class ConflictResolutionUiState(
-    val conflict: NoteConflict? = null,
-    val draftTitle: String = "",
-    val draftBody: String = "",
-)
+sealed interface ConflictResolutionUiState {
+    data object Loading : ConflictResolutionUiState
+
+    data class Success(
+        val conflict: NoteConflict,
+        val draftTitle: String,
+        val draftBody: String,
+    ) : ConflictResolutionUiState
+
+    data object NoConflict : ConflictResolutionUiState
+
+    data class Error(val message: String?) : ConflictResolutionUiState
+}
 
 @HiltViewModel
 class ConflictResolutionViewModel @Inject constructor(
@@ -31,38 +40,45 @@ class ConflictResolutionViewModel @Inject constructor(
 
     val noteId: String = savedStateHandle.toRoute<ConflictRoute>().noteId
 
-    private val conflict: StateFlow<NoteConflict?> = observeConflict(noteId)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-
     private val draft = MutableStateFlow<Pair<String, String>?>(null)
 
-    val uiState: StateFlow<ConflictResolutionUiState> = combine(conflict, draft) { conflict, draft ->
-        ConflictResolutionUiState(
-            conflict = conflict,
-            draftTitle = draft?.first ?: conflict?.localTitle.orEmpty(),
-            draftBody = draft?.second ?: conflict?.localBody.orEmpty(),
-        )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ConflictResolutionUiState())
+    val uiState: StateFlow<ConflictResolutionUiState> = observeConflict(noteId)
+        .combine(draft) { conflict, draft ->
+            if (conflict == null) {
+                ConflictResolutionUiState.NoConflict
+            } else {
+                ConflictResolutionUiState.Success(
+                    conflict = conflict,
+                    draftTitle = draft?.first ?: conflict.localTitle,
+                    draftBody = draft?.second ?: conflict.localBody,
+                )
+            }
+        }
+        .catch { failure -> emit(ConflictResolutionUiState.Error(failure.message)) }
+        .stateIn(viewModelScope, SharingStarted.Lazily, ConflictResolutionUiState.Loading)
 
     fun useMine() {
-        conflict.value?.let { draft.value = it.localTitle to it.localBody }
+        val state = uiState.value as? ConflictResolutionUiState.Success ?: return
+        draft.value = state.conflict.localTitle to state.conflict.localBody
     }
 
     fun useTheirs() {
-        conflict.value?.let { draft.value = it.remoteTitle to it.remoteBody }
+        val state = uiState.value as? ConflictResolutionUiState.Success ?: return
+        draft.value = state.conflict.remoteTitle to state.conflict.remoteBody
     }
 
     fun onDraftTitleChange(value: String) {
-        draft.value = value to uiState.value.draftBody
+        val state = uiState.value as? ConflictResolutionUiState.Success ?: return
+        draft.value = value to state.draftBody
     }
 
     fun onDraftBodyChange(value: String) {
-        draft.value = uiState.value.draftTitle to value
+        val state = uiState.value as? ConflictResolutionUiState.Success ?: return
+        draft.value = state.draftTitle to value
     }
 
     fun resolve(onDone: () -> Unit) {
-        val state = uiState.value
-        if (state.conflict == null) return
+        val state = uiState.value as? ConflictResolutionUiState.Success ?: return
         viewModelScope.launch {
             resolveConflict(noteId, state.draftTitle, state.draftBody)
             onDone()

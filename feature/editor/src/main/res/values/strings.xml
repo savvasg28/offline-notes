@@ -3,4 +3,5 @@
     <string name="editor_conflict_banner">This note changed on another device.</string>
     <string name="editor_rejected_banner">The server refused this change.</string>
     <string name="editor_rejected_discard">Discard</string>
+    <string name="editor_error">Couldn\'t open this note</string>
 </resources>

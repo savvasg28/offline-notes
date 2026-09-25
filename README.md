@@ -191,7 +191,7 @@ two devices converging.
 ### Tests and checks
 
 ```bash
-./gradlew test                       # 93 unit tests, every module
+./gradlew test                       # 100 unit tests, every module
 ./gradlew lint detektAll             # Android Lint (warnings are errors) + detekt with type resolution
 ./gradlew connectedDebugAndroidTest  # 4 instrumented tests: FTS5 search
 ```

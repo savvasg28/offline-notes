@@ -14,19 +14,24 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
-data class NoteEditorUiState(
-    val isLoading: Boolean = true,
-    val title: String = "",
-    val body: String = "",
-    val syncState: SyncState? = null,
-    val rejectionMessage: String? = null,
-)
+sealed interface NoteEditorUiState {
+    data object Loading : NoteEditorUiState
+
+    data class Success(
+        val title: String = "",
+        val body: String = "",
+        val syncState: SyncState? = null,
+        val rejectionMessage: String? = null,
+    ) : NoteEditorUiState
+
+    data class Error(val message: String?) : NoteEditorUiState
+}
 
 @HiltViewModel
 class NoteEditorViewModel @Inject constructor(
@@ -39,7 +44,7 @@ class NoteEditorViewModel @Inject constructor(
 
     val noteId: String = savedStateHandle.toRoute<EditorRoute>().noteId
 
-    private val mutableUiState = MutableStateFlow(NoteEditorUiState())
+    private val mutableUiState = MutableStateFlow<NoteEditorUiState>(NoteEditorUiState.Loading)
     val uiState: StateFlow<NoteEditorUiState> = mutableUiState.asStateFlow()
 
     private var userOwnsContent = false
@@ -47,21 +52,23 @@ class NoteEditorViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            observeNote(noteId).collect { note ->
-                if (note == null) {
-                    mutableUiState.update { it.copy(isLoading = false) }
-                    return@collect
+            observeNote(noteId)
+                .catch { failure -> mutableUiState.value = NoteEditorUiState.Error(failure.message) }
+                .collect { note ->
+                    if (note == null) {
+                        mutableUiState.update { it as? NoteEditorUiState.Success ?: NoteEditorUiState.Success() }
+                        return@collect
+                    }
+                    noteExists = true
+                    mutableUiState.update { current ->
+                        val loaded = current as? NoteEditorUiState.Success ?: NoteEditorUiState.Success()
+                        val status = loaded.copy(
+                            syncState = note.syncState,
+                            rejectionMessage = note.rejection?.message,
+                        )
+                        if (userOwnsContent) status else status.copy(title = note.title, body = note.body)
+                    }
                 }
-                noteExists = true
-                mutableUiState.update { current ->
-                    val status = current.copy(
-                        isLoading = false,
-                        syncState = note.syncState,
-                        rejectionMessage = note.rejection?.message,
-                    )
-                    if (userOwnsContent) status else status.copy(title = note.title, body = note.body)
-                }
-            }
         }
     }
 
@@ -77,10 +84,11 @@ class NoteEditorViewModel @Inject constructor(
         if (userOwnsContent) requestSync()
     }
 
-    private fun edit(transform: (NoteEditorUiState) -> NoteEditorUiState) {
-        if (mutableUiState.value.isLoading) return
+    private fun edit(transform: (NoteEditorUiState.Success) -> NoteEditorUiState.Success) {
+        val current = mutableUiState.value as? NoteEditorUiState.Success ?: return
         userOwnsContent = true
-        val edited = mutableUiState.updateAndGet(transform)
+        val edited = transform(current)
+        mutableUiState.value = edited
         if (!noteExists && edited.title.isBlank() && edited.body.isBlank()) return
         noteExists = true
         viewModelScope.launch { withContext(NonCancellable) { saveNote(noteId, edited.title, edited.body) } }

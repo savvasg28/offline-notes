@@ -2,6 +2,7 @@
 <resources>
     <string name="conflict_title">Resolve conflict</string>
     <string name="conflict_none">No conflict to resolve.</string>
+    <string name="conflict_error">Couldn\'t load this conflict</string>
     <string name="conflict_explanation">This note changed on another device while you had local edits pending. Compare the three versions below, then keep one side or edit the result manually.</string>
     <string name="conflict_version_local">Local (yours)</string>
     <string name="conflict_version_base">Base (common ancestor)</string>
