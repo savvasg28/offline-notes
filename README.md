@@ -204,3 +204,7 @@ as the defect list.
 
 Kotlin 2.2 · Compose / Material 3 · Room 2.8 · WorkManager · Hilt · Coroutines/Flow ·
 Retrofit/OkHttp + kotlinx-serialization · detekt · Konsist · Mockoon.
+
+## License
+
+[MIT](LICENSE).
