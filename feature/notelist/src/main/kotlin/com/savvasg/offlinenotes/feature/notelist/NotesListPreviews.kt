@@ -41,6 +41,7 @@ class NotesListUiStateProvider : PreviewParameterProvider<NotesListUiState> {
             ),
         ),
         NotesListUiState(searchQuery = "", notes = emptyList()),
+        NotesListUiState(searchQuery = "", notes = null),
         NotesListUiState(searchQuery = "quarterly", notes = emptyList()),
     )
 }

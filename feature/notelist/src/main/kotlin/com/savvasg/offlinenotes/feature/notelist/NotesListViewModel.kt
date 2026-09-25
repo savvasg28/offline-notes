@@ -22,8 +22,7 @@ import javax.inject.Inject
 
 data class NotesListUiState(
     val searchQuery: String = "",
-    val notes: List<NoteSummary> = emptyList(),
-    val isLoaded: Boolean = false,
+    val notes: List<NoteSummary>? = null,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
@@ -40,8 +39,8 @@ class NotesListViewModel @Inject constructor(
         .flatMapLatest { query -> observeNotes(query) }
 
     val uiState: StateFlow<NotesListUiState> =
-        combine(searchQuery, matchingNotes) { query, notes -> NotesListUiState(query, notes, isLoaded = true) }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NotesListUiState())
+        combine(searchQuery, matchingNotes, ::NotesListUiState)
+            .stateIn(viewModelScope, SharingStarted.Lazily, NotesListUiState())
 
     fun onSearchQueryChange(query: String) {
         searchQuery.value = query

@@ -82,10 +82,10 @@ fun NotesListContent(
                 modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
             )
 
-            if (!uiState.isLoaded) {
-                Unit
-            } else if (uiState.notes.isEmpty()) {
-                EmptyState(
+            val notes = uiState.notes
+            when {
+                notes == null -> Unit
+                notes.isEmpty() -> EmptyState(
                     title = stringResource(
                         if (uiState.searchQuery.isBlank()) R.string.notes_list_empty else R.string.notes_list_no_matches,
                     ),
@@ -95,8 +95,7 @@ fun NotesListContent(
                         null
                     },
                 )
-            } else {
-                LazyColumn(
+                else -> LazyColumn(
                     contentPadding = PaddingValues(
                         start = Spacing.lg,
                         end = Spacing.lg,
@@ -105,7 +104,7 @@ fun NotesListContent(
                     ),
                     verticalArrangement = Arrangement.spacedBy(Spacing.md),
                 ) {
-                    items(uiState.notes, key = { it.id }) { note ->
+                    items(notes, key = { it.id }) { note ->
                         ContentCard(
                             title = note.title.ifBlank { stringResource(DesignSystemR.string.note_untitled) },
                             snippet = note.bodySnippet,
