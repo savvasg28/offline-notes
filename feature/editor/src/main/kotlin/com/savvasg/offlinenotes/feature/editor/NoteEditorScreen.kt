@@ -11,7 +11,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -23,9 +22,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.savvasg.offlinenotes.core.designsystem.component.EditorField
 import com.savvasg.offlinenotes.core.designsystem.component.InlineBanner
 import com.savvasg.offlinenotes.core.designsystem.component.NotesTopAppBar
-import com.savvasg.offlinenotes.core.designsystem.component.SeamlessTextField
 import com.savvasg.offlinenotes.core.designsystem.theme.Spacing
 import com.savvasg.offlinenotes.domain.model.SyncState
 import com.savvasg.offlinenotes.core.designsystem.R as DesignSystemR
@@ -111,39 +110,22 @@ fun NoteEditorContent(
                 )
             }
             if (uiState.isLoading) return@Column
-            Surface(
+            EditorField(
+                value = uiState.title,
+                onValueChange = onTitleChange,
+                placeholder = stringResource(DesignSystemR.string.note_title_hint),
                 modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.large,
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            ) {
-                SeamlessTextField(
-                    value = uiState.title,
-                    onValueChange = onTitleChange,
-                    placeholder = stringResource(DesignSystemR.string.note_title_hint),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(Spacing.xs),
-                    textStyle = MaterialTheme.typography.headlineSmall,
-                    singleLine = true,
-                )
-            }
-            Surface(
+                textStyle = MaterialTheme.typography.headlineSmall,
+                singleLine = true,
+            )
+            EditorField(
+                value = uiState.body,
+                onValueChange = onBodyChange,
+                placeholder = stringResource(DesignSystemR.string.note_body_hint),
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(bottom = Spacing.lg),
-                shape = MaterialTheme.shapes.large,
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            ) {
-                SeamlessTextField(
-                    value = uiState.body,
-                    onValueChange = onBodyChange,
-                    placeholder = stringResource(DesignSystemR.string.note_body_hint),
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(Spacing.xs),
-                    textStyle = MaterialTheme.typography.bodyLarge,
-                )
-            }
+            )
         }
     }
 }

@@ -1,9 +1,7 @@
 package com.savvasg.offlinenotes.feature.conflict
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -14,19 +12,21 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.savvasg.offlinenotes.core.designsystem.component.EditorField
 import com.savvasg.offlinenotes.core.designsystem.component.EmptyState
 import com.savvasg.offlinenotes.core.designsystem.component.LabeledCard
 import com.savvasg.offlinenotes.core.designsystem.component.NotesTopAppBar
-import com.savvasg.offlinenotes.core.designsystem.component.SeamlessTextField
+import com.savvasg.offlinenotes.core.designsystem.component.SectionLabel
+import com.savvasg.offlinenotes.core.designsystem.theme.OfflineNotesTheme
 import com.savvasg.offlinenotes.core.designsystem.theme.Spacing
 import com.savvasg.offlinenotes.core.designsystem.R as DesignSystemR
 
@@ -88,7 +88,7 @@ fun ConflictResolutionContent(
 
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(Spacing.lg),
+            contentPadding = PaddingValues(start = Spacing.lg, end = Spacing.lg, top = Spacing.sm, bottom = Spacing.xxl),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             item {
@@ -103,6 +103,10 @@ fun ConflictResolutionContent(
                     label = stringResource(R.string.conflict_version_local),
                     title = conflict.localTitle.ifBlank { stringResource(DesignSystemR.string.note_untitled) },
                     body = conflict.localBody,
+                    accent = OfflineNotesTheme.statusColors.pending,
+                    action = {
+                        TextButton(onClick = onUseMine) { Text(stringResource(R.string.conflict_keep_mine)) }
+                    },
                 )
             }
             item {
@@ -113,6 +117,7 @@ fun ConflictResolutionContent(
                         label = stringResource(R.string.conflict_version_base),
                         title = baseTitle.ifBlank { stringResource(DesignSystemR.string.note_untitled) },
                         body = baseBody,
+                        accent = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
                     Text(
@@ -127,40 +132,44 @@ fun ConflictResolutionContent(
                     label = stringResource(R.string.conflict_version_remote),
                     title = conflict.remoteTitle.ifBlank { stringResource(DesignSystemR.string.note_untitled) },
                     body = conflict.remoteBody,
+                    accent = OfflineNotesTheme.statusColors.synced,
+                    action = {
+                        TextButton(onClick = onUseTheirs) { Text(stringResource(R.string.conflict_keep_theirs)) }
+                    },
                 )
             }
-
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    Text(
-                        stringResource(R.string.conflict_resolution_heading),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        OutlinedButton(onClick = onUseMine, modifier = Modifier.weight(1f)) {
-                            Text(stringResource(R.string.conflict_keep_mine))
-                        }
-                        OutlinedButton(onClick = onUseTheirs, modifier = Modifier.weight(1f)) {
-                            Text(stringResource(R.string.conflict_keep_theirs))
-                        }
-                    }
-                    SeamlessTextField(
-                        value = uiState.draftTitle,
-                        onValueChange = onDraftTitleChange,
-                        placeholder = stringResource(DesignSystemR.string.note_title_hint),
-                        modifier = Modifier.fillMaxWidth(),
-                        textStyle = MaterialTheme.typography.titleMedium,
-                        singleLine = true,
-                    )
-                    SeamlessTextField(
-                        value = uiState.draftBody,
-                        onValueChange = onDraftBodyChange,
-                        placeholder = stringResource(DesignSystemR.string.note_body_hint),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Button(onClick = onResolve, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(DesignSystemR.string.action_resolve))
-                    }
+                SectionLabel(
+                    text = stringResource(R.string.conflict_resolution_heading),
+                    modifier = Modifier.padding(top = Spacing.md),
+                )
+            }
+            item {
+                EditorField(
+                    value = uiState.draftTitle,
+                    onValueChange = onDraftTitleChange,
+                    placeholder = stringResource(DesignSystemR.string.note_title_hint),
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = MaterialTheme.typography.titleMedium,
+                    singleLine = true,
+                )
+            }
+            item {
+                EditorField(
+                    value = uiState.draftBody,
+                    onValueChange = onDraftBodyChange,
+                    placeholder = stringResource(DesignSystemR.string.note_body_hint),
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 6,
+                )
+            }
+            item {
+                Button(
+                    onClick = onResolve,
+                    modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm),
+                    shape = MaterialTheme.shapes.large,
+                ) {
+                    Text(stringResource(DesignSystemR.string.action_resolve))
                 }
             }
         }

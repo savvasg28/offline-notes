@@ -17,6 +17,7 @@ fun SeamlessTextField(
     modifier: Modifier = Modifier,
     textStyle: TextStyle = MaterialTheme.typography.bodyLarge,
     singleLine: Boolean = false,
+    minLines: Int = 1,
 ) {
     TextField(
         value = value,
@@ -27,6 +28,7 @@ fun SeamlessTextField(
         },
         textStyle = textStyle,
         singleLine = singleLine,
+        minLines = minLines,
         colors = TextFieldDefaults.colors(
             focusedContainerColor = Color.Transparent,
             unfocusedContainerColor = Color.Transparent,
