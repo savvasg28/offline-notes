@@ -10,12 +10,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -67,11 +67,9 @@ fun NotesListContent(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = { NotesTopAppBar(title = stringResource(R.string.notes_list_title)) },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = onNewNote,
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text(stringResource(R.string.notes_list_new_note)) },
-            )
+            FloatingActionButton(onClick = onNewNote) {
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.notes_list_new_note))
+            }
         },
     ) { padding ->
         val dateFormat = remember { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT) }
@@ -120,11 +118,16 @@ fun NotesListContent(
                                 )
                             },
                             trailing = {
-                                IconButton(onClick = { onDeleteNote(note.id) }) {
+                                FilledTonalIconButton(
+                                    onClick = { onDeleteNote(note.id) },
+                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    ),
+                                ) {
                                     Icon(
                                         Icons.Default.Delete,
                                         contentDescription = stringResource(R.string.notes_list_delete_note),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
                             },

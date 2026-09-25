@@ -11,6 +11,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -110,21 +111,31 @@ fun NoteEditorContent(
                 )
             }
             if (uiState.isLoading) return@Column
-            SeamlessTextField(
-                value = uiState.title,
-                onValueChange = onTitleChange,
-                placeholder = stringResource(DesignSystemR.string.note_title_hint),
-                modifier = Modifier.fillMaxWidth(),
-                textStyle = MaterialTheme.typography.headlineSmall,
-                singleLine = true,
-            )
-            SeamlessTextField(
-                value = uiState.body,
-                onValueChange = onBodyChange,
-                placeholder = stringResource(DesignSystemR.string.note_body_hint),
-                modifier = Modifier.fillMaxSize(),
-                textStyle = MaterialTheme.typography.bodyLarge,
-            )
+            Surface(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = Spacing.lg),
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ) {
+                Column(modifier = Modifier.padding(Spacing.sm)) {
+                    SeamlessTextField(
+                        value = uiState.title,
+                        onValueChange = onTitleChange,
+                        placeholder = stringResource(DesignSystemR.string.note_title_hint),
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = MaterialTheme.typography.headlineSmall,
+                        singleLine = true,
+                    )
+                    SeamlessTextField(
+                        value = uiState.body,
+                        onValueChange = onBodyChange,
+                        placeholder = stringResource(DesignSystemR.string.note_body_hint),
+                        modifier = Modifier.fillMaxSize(),
+                        textStyle = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+            }
         }
     }
 }
