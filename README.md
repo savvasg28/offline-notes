@@ -105,23 +105,16 @@ Two constraints are schema-level rather than convention:
 
 ## State diagrams
 
-Op lifecycle — the state of one row in `outbox`:
+**Outbox op lifecycle** — the state of one row in `outbox`, from a user edit to the server's
+acknowledgement. A row is never mutated after freeze; resolving a conflict or editing again
+creates a new row with a new `opId` in the same transaction that deletes the old one.
 
-```mermaid
-stateDiagram-v2
-    [*] --> PENDING: user edit
-    PENDING --> IN_FLIGHT: freeze (one txn)
-    IN_FLIGHT --> [*]: Applied
-    IN_FLIGHT --> PARKED: Conflict
-    IN_FLIGHT --> REJECTED: Rejected
-    IN_FLIGHT --> PENDING: crash, reset on next run
-    PARKED --> PENDING: user resolves (new op, base = remote version)
-    REJECTED --> PENDING: user edits again
-    REJECTED --> [*]: user discards
-```
+![Outbox op lifecycle](docs/op-lifecycle.png)
 
-An op row is only ever deleted when its data is on the server or the user explicitly supersedes or
-discards it. No TTL, no GC.
+**Sync round** — what one WorkManager run does. Every step is either a transaction or idempotent,
+so a crash at any point is recovered by the next run.
+
+![Sync round](docs/sync-round.png)
 
 ## Implementation notes
 
