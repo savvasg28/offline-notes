@@ -25,7 +25,7 @@ dependencies {
     lintChecks(libs.compose.lint.checks)
 
     implementation(project(":domain"))
-    implementation(project(":core:designsystem"))
+    implementation(project(":designsystem"))
 
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.core)

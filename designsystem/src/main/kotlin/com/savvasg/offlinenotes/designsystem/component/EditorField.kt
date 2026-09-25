@@ -1,4 +1,4 @@
-package com.savvasg.offlinenotes.core.designsystem.component
+package com.savvasg.offlinenotes.designsystem.component
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -7,7 +7,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextStyle
-import com.savvasg.offlinenotes.core.designsystem.theme.Spacing
+import com.savvasg.offlinenotes.designsystem.theme.Spacing
 
 @Composable
 fun EditorField(

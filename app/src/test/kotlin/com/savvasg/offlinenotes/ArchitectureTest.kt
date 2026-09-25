@@ -52,7 +52,7 @@ class ArchitectureTest {
     fun `the design system knows nothing about the domain`() {
         Konsist.scopeFromProject()
             .files
-            .filter { it.packagee?.name?.startsWith("com.savvasg.offlinenotes.core.designsystem") == true }
+            .filter { it.packagee?.name?.startsWith("com.savvasg.offlinenotes.designsystem") == true }
             .assertFalse { file ->
                 file.imports.any { it.name.startsWith("com.savvasg.offlinenotes.domain") }
             }

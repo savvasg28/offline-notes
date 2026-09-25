@@ -9,7 +9,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import com.google.common.truth.Truth.assertThat
-import com.savvasg.offlinenotes.core.designsystem.theme.OfflineNotesTheme
+import com.savvasg.offlinenotes.designsystem.theme.OfflineNotesTheme
 import com.savvasg.offlinenotes.domain.model.NoteConflict
 import org.junit.Rule
 import org.junit.Test

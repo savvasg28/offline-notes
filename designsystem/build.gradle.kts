@@ -10,7 +10,7 @@ composeCompiler {
 }
 
 android {
-    namespace = "com.savvasg.offlinenotes.core.designsystem"
+    namespace = "com.savvasg.offlinenotes.designsystem"
 
     buildFeatures {
         compose = true

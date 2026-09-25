@@ -24,18 +24,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.savvasg.offlinenotes.core.designsystem.component.ContentCard
-import com.savvasg.offlinenotes.core.designsystem.component.EmptyState
-import com.savvasg.offlinenotes.core.designsystem.component.LoadingIndicator
-import com.savvasg.offlinenotes.core.designsystem.component.NotesTopAppBar
-import com.savvasg.offlinenotes.core.designsystem.component.SearchField
-import com.savvasg.offlinenotes.core.designsystem.component.StatusDot
-import com.savvasg.offlinenotes.core.designsystem.theme.OfflineNotesTheme
-import com.savvasg.offlinenotes.core.designsystem.theme.Spacing
+import com.savvasg.offlinenotes.designsystem.component.ContentCard
+import com.savvasg.offlinenotes.designsystem.component.EmptyState
+import com.savvasg.offlinenotes.designsystem.component.LoadingIndicator
+import com.savvasg.offlinenotes.designsystem.component.NotesTopAppBar
+import com.savvasg.offlinenotes.designsystem.component.SearchField
+import com.savvasg.offlinenotes.designsystem.component.StatusDot
+import com.savvasg.offlinenotes.designsystem.theme.OfflineNotesTheme
+import com.savvasg.offlinenotes.designsystem.theme.Spacing
 import com.savvasg.offlinenotes.domain.model.SyncState
 import java.text.DateFormat
 import java.util.Date
-import com.savvasg.offlinenotes.core.designsystem.R as DesignSystemR
+import com.savvasg.offlinenotes.designsystem.R as DesignSystemR
 
 @Composable
 fun NotesListScreen(

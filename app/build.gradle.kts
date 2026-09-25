@@ -50,7 +50,7 @@ dependencies {
     implementation(project(":data:database"))
     implementation(project(":data:network"))
     implementation(project(":data"))
-    implementation(project(":core:designsystem"))
+    implementation(project(":designsystem"))
     implementation(project(":sync"))
     implementation(project(":feature:notelist"))
     implementation(project(":feature:editor"))

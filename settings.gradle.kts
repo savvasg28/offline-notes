@@ -25,7 +25,7 @@ include(":data:database")
 include(":data:network")
 include(":sync")
 
-include(":core:designsystem")
+include(":designsystem")
 
 include(":feature:notelist")
 include(":feature:editor")

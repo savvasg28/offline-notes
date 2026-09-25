@@ -1,4 +1,4 @@
-package com.savvasg.offlinenotes.core.designsystem.theme
+package com.savvasg.offlinenotes.designsystem.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle

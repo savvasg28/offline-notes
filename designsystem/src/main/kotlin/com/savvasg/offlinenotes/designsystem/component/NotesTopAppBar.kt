@@ -1,4 +1,4 @@
-package com.savvasg.offlinenotes.core.designsystem.component
+package com.savvasg.offlinenotes.designsystem.component
 
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material3.ExperimentalMaterial3Api

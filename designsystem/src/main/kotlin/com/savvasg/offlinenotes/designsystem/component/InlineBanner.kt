@@ -1,4 +1,4 @@
-package com.savvasg.offlinenotes.core.designsystem.component
+package com.savvasg.offlinenotes.designsystem.component
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -12,7 +12,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.savvasg.offlinenotes.core.designsystem.theme.Spacing
+import com.savvasg.offlinenotes.designsystem.theme.Spacing
 
 @Composable
 fun InlineBanner(

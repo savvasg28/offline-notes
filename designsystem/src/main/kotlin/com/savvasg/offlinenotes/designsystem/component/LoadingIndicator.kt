@@ -1,4 +1,4 @@
-package com.savvasg.offlinenotes.core.designsystem.component
+package com.savvasg.offlinenotes.designsystem.component
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.LinearProgressIndicator

@@ -5,7 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
-import com.savvasg.offlinenotes.core.designsystem.theme.OfflineNotesTheme
+import com.savvasg.offlinenotes.designsystem.theme.OfflineNotesTheme
 import com.savvasg.offlinenotes.domain.model.SyncState
 
 class NoteEditorUiStateProvider : PreviewParameterProvider<NoteEditorUiState> {
