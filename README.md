@@ -10,6 +10,15 @@ without losing anyone's work. The sync engine is the product; the UI exists to e
 Works fully offline the moment it installs. Sync targets a [Mockoon](#running-against-a-mock-server)
 mock of the wire contract; no account, no backend to deploy.
 
+<table>
+  <tr>
+    <td align="center"><img src="docs/flow-offline-edit.gif" width="150"><br><sub>Edit offline, sync later</sub></td>
+    <td align="center"><img src="docs/flow-conflict.gif" width="150"><br><sub>Conflict, resolved by the user</sub></td>
+    <td align="center"><img src="docs/flow-rejected.gif" width="150"><br><sub>Server rejects a change</sub></td>
+    <td align="center"><img src="docs/flow-remote-change.gif" width="150"><br><sub>Change arrives from another device</sub></td>
+  </tr>
+</table>
+
 ## Functional requirements
 
 - Create, edit, search and delete notes with the device offline.
@@ -171,12 +180,13 @@ The debug build points at `http://10.0.2.2:8080/` (the emulator's alias for the 
 `BuildConfig.API_BASE_URL` in `data/network/build.gradle.kts`. Each route ships several responses;
 enable one at a time in the Mockoon UI to drive a scenario:
 
-- **Conflict** on `POST /push`, then edit a note — the conflict banner appears on the next sync.
+- **Conflict** on `POST /push`, then edit a note you created — the conflict banner appears on the next sync. Resolving is accepted (a rule matches the resolution's `baseVersion`).
 - **Rejected** on `POST /push` — the note shows *Not saved* with the reason and a Discard action.
 - **Remote change** on `GET /pull`, then foreground the app — a note edited elsewhere arrives.
 - **410** on `GET /pull` — the client discards its cursor and re-bootstraps.
 
-Mockoon is stateless, so it drives every client path but cannot show two devices converging.
+Enable one scenario at a time. Mockoon is stateless, so it drives every client path but cannot show
+two devices converging.
 
 ### Tests and checks
 

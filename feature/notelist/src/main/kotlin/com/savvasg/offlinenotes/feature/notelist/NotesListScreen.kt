@@ -82,7 +82,9 @@ fun NotesListContent(
                 modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
             )
 
-            if (uiState.notes.isEmpty()) {
+            if (!uiState.isLoaded) {
+                Unit
+            } else if (uiState.notes.isEmpty()) {
                 EmptyState(
                     title = stringResource(
                         if (uiState.searchQuery.isBlank()) R.string.notes_list_empty else R.string.notes_list_no_matches,

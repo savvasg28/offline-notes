@@ -143,6 +143,22 @@ class NoteEditorViewModelTest {
     }
 
     @Test
+    fun `a null emission before the note has ever been observed does not close the editor`() = runTest {
+        viewModel.onTitleChange("G")
+        note.tryEmit(null)
+
+        assertThat(viewModel.uiState.value.isGone).isFalse()
+    }
+
+    @Test
+    fun `the editor closes once a note it has shown is deleted`() = runTest {
+        note.tryEmit(note("T", "B", SyncState.SYNCED))
+        note.tryEmit(null)
+
+        assertThat(viewModel.uiState.value.isGone).isTrue()
+    }
+
+    @Test
     fun `closing the editor after an edit expedites a sync`() = runTest {
         viewModel.onTitleChange("Title")
         viewModel.onEditorClosed()

@@ -26,6 +26,7 @@ data class NoteEditorUiState(
     val body: String = "",
     val syncState: SyncState? = null,
     val rejectionMessage: String? = null,
+    val isGone: Boolean = false,
 )
 
 @HiltViewModel
@@ -44,15 +45,17 @@ class NoteEditorViewModel @Inject constructor(
 
     private var userOwnsContent = false
     private var noteExists = false
+    private var noteObserved = false
 
     init {
         viewModelScope.launch {
             observeNote(noteId).collect { note ->
                 if (note == null) {
-                    mutableUiState.update { it.copy(isLoading = false) }
+                    mutableUiState.update { it.copy(isLoading = false, isGone = noteObserved) }
                     return@collect
                 }
                 noteExists = true
+                noteObserved = true
                 mutableUiState.update { current ->
                     val status = current.copy(
                         isLoading = false,

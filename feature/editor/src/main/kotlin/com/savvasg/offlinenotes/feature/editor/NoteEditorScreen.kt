@@ -13,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
@@ -36,6 +37,11 @@ fun NoteEditorScreen(
     viewModel: NoteEditorViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    val currentOnBack by rememberUpdatedState(onBack)
+    LaunchedEffect(uiState.isGone) {
+        if (uiState.isGone) currentOnBack()
+    }
 
     val currentViewModel by rememberUpdatedState(viewModel)
     val lifecycleOwner = LocalLifecycleOwner.current
