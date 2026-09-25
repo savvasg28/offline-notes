@@ -10,6 +10,5 @@ captures/
 *.apk
 *.aab
 /app/release/
-/server/data/
 .kotlin/
 .claude/
