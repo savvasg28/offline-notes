@@ -9,6 +9,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -46,7 +47,7 @@ class NotesListViewModelTest {
             val job = launch { viewModel.uiState.collect {} }
             runCurrent()
 
-            assertThat(viewModel.uiState.value.notes).containsExactly(note)
+            assertThat(viewModel.notes()).containsExactly(note)
 
             job.cancel()
         }
@@ -63,8 +64,8 @@ class NotesListViewModelTest {
             viewModel.onSearchQueryChange("")
             runCurrent()
 
-            assertThat(viewModel.uiState.value.searchQuery).isEmpty()
-            assertThat(viewModel.uiState.value.notes).containsExactly(note)
+            assertThat(viewModel.searchQuery.value).isEmpty()
+            assertThat(viewModel.notes()).containsExactly(note)
 
             job.cancel()
         }
@@ -79,8 +80,23 @@ class NotesListViewModelTest {
             viewModel.onSearchQueryChange("we")
             runCurrent()
 
-            assertThat(viewModel.uiState.value.searchQuery).isEqualTo("we")
+            assertThat(viewModel.searchQuery.value).isEqualTo("we")
 
             job.cancel()
         }
+
+    @Test
+    fun `a failing query surfaces as an error state instead of crashing the screen`() =
+        runTest(dispatcher.scheduler) {
+            every { observeNotes(any()) } returns flow { throw IllegalStateException("fts5 unavailable") }
+            val viewModel = NotesListViewModel(observeNotes, deleteNote)
+            val job = launch { viewModel.uiState.collect {} }
+            runCurrent()
+
+            assertThat(viewModel.uiState.value).isEqualTo(NotesListUiState.Error("fts5 unavailable"))
+
+            job.cancel()
+        }
+
+    private fun NotesListViewModel.notes() = (uiState.value as NotesListUiState.Success).notes
 }

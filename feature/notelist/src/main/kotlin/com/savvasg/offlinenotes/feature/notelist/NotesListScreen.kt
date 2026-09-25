@@ -26,6 +26,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.savvasg.offlinenotes.core.designsystem.component.ContentCard
 import com.savvasg.offlinenotes.core.designsystem.component.EmptyState
+import com.savvasg.offlinenotes.core.designsystem.component.LoadingIndicator
 import com.savvasg.offlinenotes.core.designsystem.component.NotesTopAppBar
 import com.savvasg.offlinenotes.core.designsystem.component.SearchField
 import com.savvasg.offlinenotes.core.designsystem.component.StatusDot
@@ -43,9 +44,11 @@ fun NotesListScreen(
     viewModel: NotesListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
 
     NotesListContent(
         uiState = uiState,
+        searchQuery = searchQuery,
         onSearchQueryChange = viewModel::onSearchQueryChange,
         onNoteClick = onNoteClick,
         onDeleteNote = viewModel::onDeleteNote,
@@ -56,6 +59,7 @@ fun NotesListScreen(
 @Composable
 fun NotesListContent(
     uiState: NotesListUiState,
+    searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     onNoteClick: (String) -> Unit,
     onDeleteNote: (String) -> Unit,
@@ -72,70 +76,91 @@ fun NotesListContent(
             }
         },
     ) { padding ->
-        val dateFormat = remember { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT) }
-
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             SearchField(
-                value = uiState.searchQuery,
+                value = searchQuery,
                 onValueChange = onSearchQueryChange,
                 placeholder = stringResource(R.string.notes_list_search_hint),
                 modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
             )
-
-            val notes = uiState.notes
-            when {
-                notes == null -> Unit
-                notes.isEmpty() -> EmptyState(
-                    title = stringResource(
-                        if (uiState.searchQuery.isBlank()) R.string.notes_list_empty else R.string.notes_list_no_matches,
-                    ),
-                    supporting = if (uiState.searchQuery.isBlank()) {
-                        stringResource(R.string.notes_list_empty_supporting)
-                    } else {
-                        null
-                    },
+            when (uiState) {
+                NotesListUiState.Loading -> LoadingIndicator(
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
                 )
-                else -> LazyColumn(
-                    contentPadding = PaddingValues(
-                        start = Spacing.lg,
-                        end = Spacing.lg,
-                        top = Spacing.sm,
-                        bottom = Spacing.xxl,
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                ) {
-                    items(notes, key = { it.id }) { note ->
-                        ContentCard(
-                            title = note.title.ifBlank { stringResource(DesignSystemR.string.note_untitled) },
-                            snippet = note.bodySnippet,
-                            meta = remember(note.lastUpdated, dateFormat) {
-                                dateFormat.format(Date(note.lastUpdated))
-                            },
-                            onClick = { onNoteClick(note.id) },
-                            leading = {
-                                StatusDot(
-                                    color = note.syncState.color(),
-                                    contentDescription = stringResource(note.syncState.labelRes()),
-                                )
-                            },
-                            trailing = {
-                                FilledTonalIconButton(
-                                    onClick = { onDeleteNote(note.id) },
-                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    ),
-                                ) {
-                                    Icon(
-                                        Icons.Default.Delete,
-                                        contentDescription = stringResource(R.string.notes_list_delete_note),
-                                    )
-                                }
-                            },
+
+                is NotesListUiState.Error -> EmptyState(
+                    title = stringResource(R.string.notes_list_error),
+                    supporting = uiState.message,
+                )
+
+                is NotesListUiState.Success -> NotesList(
+                    state = uiState,
+                    searchQuery = searchQuery,
+                    onNoteClick = onNoteClick,
+                    onDeleteNote = onDeleteNote,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NotesList(
+    state: NotesListUiState.Success,
+    searchQuery: String,
+    onNoteClick: (String) -> Unit,
+    onDeleteNote: (String) -> Unit,
+) {
+    val notes = state.notes
+    if (notes.isEmpty()) {
+        EmptyState(
+            title = stringResource(
+                if (searchQuery.isBlank()) R.string.notes_list_empty else R.string.notes_list_no_matches,
+            ),
+            supporting = if (searchQuery.isBlank()) stringResource(R.string.notes_list_empty_supporting) else null,
+        )
+        return
+    }
+
+    val dateFormat = remember { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT) }
+    LazyColumn(
+        contentPadding = PaddingValues(
+            start = Spacing.lg,
+            end = Spacing.lg,
+            top = Spacing.sm,
+            bottom = Spacing.xxl,
+        ),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        items(notes, key = { it.id }) { note ->
+            ContentCard(
+                title = note.title.ifBlank { stringResource(DesignSystemR.string.note_untitled) },
+                snippet = note.bodySnippet,
+                meta = remember(note.lastUpdated, dateFormat) {
+                    dateFormat.format(Date(note.lastUpdated))
+                },
+                onClick = { onNoteClick(note.id) },
+                leading = {
+                    StatusDot(
+                        color = note.syncState.color(),
+                        contentDescription = stringResource(note.syncState.labelRes()),
+                    )
+                },
+                trailing = {
+                    FilledTonalIconButton(
+                        onClick = { onDeleteNote(note.id) },
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = stringResource(R.string.notes_list_delete_note),
                         )
                     }
-                }
-            }
+                },
+            )
         }
     }
 }

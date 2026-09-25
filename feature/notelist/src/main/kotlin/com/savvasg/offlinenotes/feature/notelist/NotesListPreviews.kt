@@ -14,9 +14,8 @@ private const val NOW = 1_760_000_000_000L
 
 class NotesListUiStateProvider : PreviewParameterProvider<NotesListUiState> {
     override val values = sequenceOf(
-        NotesListUiState(
-            searchQuery = "",
-            notes = listOf(
+        NotesListUiState.Success(
+            listOf(
                 NoteSummary(
                     id = "1",
                     title = "Weekly review",
@@ -40,9 +39,9 @@ class NotesListUiStateProvider : PreviewParameterProvider<NotesListUiState> {
                 ),
             ),
         ),
-        NotesListUiState(searchQuery = "", notes = emptyList()),
-        NotesListUiState(searchQuery = "", notes = null),
-        NotesListUiState(searchQuery = "quarterly", notes = emptyList()),
+        NotesListUiState.Success(emptyList()),
+        NotesListUiState.Loading,
+        NotesListUiState.Error("Search index is unavailable"),
     )
 }
 
@@ -55,6 +54,7 @@ private fun NotesListContentPreview(
     OfflineNotesTheme {
         NotesListContent(
             uiState = uiState,
+            searchQuery = "",
             onSearchQueryChange = {},
             onNoteClick = {},
             onDeleteNote = {},

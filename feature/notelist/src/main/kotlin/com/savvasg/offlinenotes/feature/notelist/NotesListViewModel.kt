@@ -8,22 +8,26 @@ import com.savvasg.offlinenotes.domain.usecase.ObserveNotesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
 
-data class NotesListUiState(
-    val searchQuery: String = "",
-    val notes: List<NoteSummary>? = null,
-)
+sealed interface NotesListUiState {
+    data object Loading : NotesListUiState
+
+    data class Success(val notes: List<NoteSummary>) : NotesListUiState
+
+    data class Error(val message: String?) : NotesListUiState
+}
 
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 @HiltViewModel
@@ -32,18 +36,18 @@ class NotesListViewModel @Inject constructor(
     private val deleteNote: DeleteNoteUseCase,
 ) : ViewModel() {
 
-    private val searchQuery = MutableStateFlow("")
+    private val query = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = query.asStateFlow()
 
-    private val matchingNotes: Flow<List<NoteSummary>> = searchQuery
-        .debounce { query -> if (query.isEmpty()) 0L else SEARCH_DEBOUNCE_MS }
-        .flatMapLatest { query -> observeNotes(query) }
+    val uiState: StateFlow<NotesListUiState> = query
+        .debounce { current -> if (current.isEmpty()) 0L else SEARCH_DEBOUNCE_MS }
+        .flatMapLatest { current -> observeNotes(current) }
+        .map<List<NoteSummary>, NotesListUiState> { notes -> NotesListUiState.Success(notes) }
+        .catch { failure -> emit(NotesListUiState.Error(failure.message)) }
+        .stateIn(viewModelScope, SharingStarted.Lazily, NotesListUiState.Loading)
 
-    val uiState: StateFlow<NotesListUiState> =
-        combine(searchQuery, matchingNotes, ::NotesListUiState)
-            .stateIn(viewModelScope, SharingStarted.Lazily, NotesListUiState())
-
-    fun onSearchQueryChange(query: String) {
-        searchQuery.value = query
+    fun onSearchQueryChange(value: String) {
+        query.value = value
     }
 
     fun onDeleteNote(id: String) {
