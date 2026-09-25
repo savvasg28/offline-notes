@@ -112,29 +112,37 @@ fun NoteEditorContent(
             }
             if (uiState.isLoading) return@Column
             Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ) {
+                SeamlessTextField(
+                    value = uiState.title,
+                    onValueChange = onTitleChange,
+                    placeholder = stringResource(DesignSystemR.string.note_title_hint),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(Spacing.xs),
+                    textStyle = MaterialTheme.typography.headlineSmall,
+                    singleLine = true,
+                )
+            }
+            Surface(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(bottom = Spacing.lg),
                 shape = MaterialTheme.shapes.large,
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
             ) {
-                Column(modifier = Modifier.padding(Spacing.sm)) {
-                    SeamlessTextField(
-                        value = uiState.title,
-                        onValueChange = onTitleChange,
-                        placeholder = stringResource(DesignSystemR.string.note_title_hint),
-                        modifier = Modifier.fillMaxWidth(),
-                        textStyle = MaterialTheme.typography.headlineSmall,
-                        singleLine = true,
-                    )
-                    SeamlessTextField(
-                        value = uiState.body,
-                        onValueChange = onBodyChange,
-                        placeholder = stringResource(DesignSystemR.string.note_body_hint),
-                        modifier = Modifier.fillMaxSize(),
-                        textStyle = MaterialTheme.typography.bodyLarge,
-                    )
-                }
+                SeamlessTextField(
+                    value = uiState.body,
+                    onValueChange = onBodyChange,
+                    placeholder = stringResource(DesignSystemR.string.note_body_hint),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(Spacing.xs),
+                    textStyle = MaterialTheme.typography.bodyLarge,
+                )
             }
         }
     }
