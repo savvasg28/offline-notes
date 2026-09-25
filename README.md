@@ -65,7 +65,7 @@ Two endpoints, specified in [`openapi/offline-notes.yaml`](openapi/offline-notes
 | `POST /push` | Array of frozen ops: `opId`, `type` (CREATE/UPDATE/DELETE), `noteId`, `baseVersion`, `title`, `body` | One result per op, in order: `Applied{newVersion}`, `Conflict{base*, remote*}`, `Rejected{code, message}` |
 | `GET /pull?since=` | Opaque cursor, omitted for a full snapshot | `{notes[], nextSyncToken, hasMore}`, paged. Each note is either content or a tombstone |
 
-Rules the schema cannot express.
+Design decisions.
 
 - **Compare-and-swap.** An op whose `baseVersion` isn't the note's current server version comes
   back as `Conflict`, carrying the remote side, and the base side when history still has it.
@@ -74,6 +74,9 @@ Rules the schema cannot express.
   same `opId`s. 401 ends the round, there is nothing to retry with. 410 on `/pull` means the cursor
   expired, so the client re-bootstraps.
 - **Client-generated `noteId`.** A note has an id before it has ever synced.
+- **Pagination.** `/pull` pages with `hasMore`. A delta page is applied with its own cursor, so a
+  crash between pages loses nothing already applied. A snapshot page is applied without one, the
+  cursor is written only after the last page.
 
 ## Data model
 
@@ -86,31 +89,6 @@ Room, schema v1 (`data/database/schemas/`), `BundledSQLiteDriver` for FTS5.
 | `note_conflicts` | The three inputs of a staged conflict: base, local, remote |
 | `sync_meta` | The pull cursor (one row) |
 | `notes_fts` | FTS5 index over `notes`, kept in sync by triggers |
-
-```text
-notes           id PK, title, body, serverVersion?, syncState, isDeleted, createdAt, lastUpdated
-outbox          opId PK, noteId -> notes, opType, title?, body?, status, createdAt,
-                attemptCount, rejectionCode?, rejectionMessage?
-note_conflicts  noteId PK, opId -> outbox (cascade), baseVersion?, baseTitle?, baseBody?,
-                remoteVersion, remoteTitle, remoteBody, detectedAt
-sync_meta       id = 0, syncToken?
-```
-
-`?` marks a nullable column. `syncState` is derived (see below). `baseVersion` is not stored on the
-op, it is read from `notes.serverVersion` at freeze time.
-
-Two constraints live in the schema rather than in convention.
-
-- **One mutable op per note.** A `BEFORE INSERT` trigger on `outbox` rejects a second `PENDING`
-  row for the same note. Rapid edits coalesce into one row, an edit during an in-flight op creates
-  a new one. The frozen op is never mutated, so `opId` works as an idempotency key. It is a trigger
-  rather than a partial unique index because Room can't model partial indices, and a unique index
-  would also reject the crash-recovery case where a replayed op and a newer edit are both
-  `PENDING`. A round freezes only the oldest op per note, so the replay is acknowledged first and
-  the newer edit ships with the right `baseVersion`.
-- **Derived `syncState`.** Every transaction that touches `outbox` or `note_conflicts` ends by
-  recomputing the note's state from those tables, `CONFLICT` > `REJECTED` > `PENDING` > `SYNCED`.
-  So the badge in the list is always computed from the same rows it summarises.
 
 ## State diagrams
 
@@ -180,13 +158,6 @@ The debug build points at `http://10.0.2.2:8080/` (the emulator's alias for the 
 `BuildConfig.API_BASE_URL` in `data/network/build.gradle.kts`. Each route ships several responses,
 enable one at a time in the Mockoon UI to drive a scenario.
 
-- **Conflict** on `POST /push`, then edit a note you created. The conflict banner appears on the next sync. Resolving is accepted, a rule matches the resolution's `baseVersion`.
-- **Rejected** on `POST /push`. The note shows *Not saved* with the reason and a Discard action.
-- **Remote change** on `GET /pull`, then foreground the app. A note edited elsewhere arrives.
-- **410** on `GET /pull`. The client discards its cursor and re-bootstraps.
-
-Mockoon is stateless, so it drives every client path but cannot show two devices converging.
-
 ### Tests and checks
 
 ```bash
@@ -194,11 +165,6 @@ Mockoon is stateless, so it drives every client path but cannot show two devices
 ./gradlew lint detektAll             # Android Lint (warnings are errors) + detekt with type resolution
 ./gradlew connectedDebugAndroidTest  # 4 instrumented tests: FTS5 search
 ```
-
-`SyncEngine` is tested on the JVM against fake ports, `NoteTransactions` against a real Room
-instance under Robolectric. Most of the named scenario tests came from a defect found while
-building this, so the test names in `NoteTransactionsTest` and the two `SyncEngineTest`s double
-as the defect list.
 
 ## Tech stack
 
